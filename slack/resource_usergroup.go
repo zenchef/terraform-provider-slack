@@ -5,229 +5,237 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/slack-go/slack"
 )
 
-func resourceSlackUserGroup() *schema.Resource {
-	return &schema.Resource{
-		ReadContext:   resourceSlackUserGroupRead,
-		CreateContext: resourceSlackUserGroupCreate,
-		UpdateContext: resourceSlackUserGroupUpdate,
-		DeleteContext: resourceSlackUserGroupDelete,
+var _ resource.Resource = &UsergroupResource{}
+var _ resource.ResourceWithImportState = &UsergroupResource{}
 
-		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
-		},
+func NewUsergroupResource() resource.Resource {
+	return &UsergroupResource{}
+}
 
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:     schema.TypeString,
-				Required: true,
+type UsergroupResource struct {
+	client *slack.Client
+}
+
+type UsergroupResourceModel struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Handle      types.String `tfsdk:"handle"`
+	Description types.String `tfsdk:"description"`
+	Channels    types.Set    `tfsdk:"channels"`
+	Users       types.Set    `tfsdk:"users"`
+}
+
+func (r *UsergroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_usergroup"
+}
+
+func (r *UsergroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manages a Slack usergroup",
+
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The usergroup ID",
 			},
-			"channels": {
-				Type: schema.TypeSet,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
-				Set:      schema.HashString,
-				Optional: true,
+			"name": schema.StringAttribute{
+				MarkdownDescription: "The name of the usergroup",
+				Required:            true,
 			},
-			"description": {
-				Type:     schema.TypeString,
-				Optional: true,
+			"handle": schema.StringAttribute{
+				MarkdownDescription: "The handle/mention name of the usergroup",
+				Optional:            true,
+				Computed:            true,
 			},
-			"handle": {
-				Type:     schema.TypeString,
-				Optional: true,
+			"description": schema.StringAttribute{
+				MarkdownDescription: "Description of the usergroup",
+				Optional:            true,
+				Computed:            true,
 			},
-			"users": {
-				Type: schema.TypeSet,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
-				Set:      schema.HashString,
-				Optional: true,
+			"channels": schema.SetAttribute{
+				MarkdownDescription: "Channel IDs that the usergroup should be associated with",
+				ElementType:         types.StringType,
+				Optional:            true,
+			},
+			"users": schema.SetAttribute{
+				MarkdownDescription: "User IDs that are members of the usergroup",
+				ElementType:         types.StringType,
+				Optional:            true,
 			},
 		},
 	}
 }
 
-func resourceSlackUserGroupCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*slack.Client)
+func (r *UsergroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
 
-	name := d.Get("name").(string)
-	description := d.Get("description").(string)
-	handle := d.Get("handle").(string)
-	channels := d.Get("channels").(*schema.Set)
-	users := d.Get("users").(*schema.Set)
+	client, ok := req.ProviderData.(*slack.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *slack.Client, got: %T", req.ProviderData),
+		)
+		return
+	}
+
+	r.client = client
+}
+
+func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data UsergroupResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get channel IDs
+	var channels []string
+	if !data.Channels.IsNull() {
+		resp.Diagnostics.Append(data.Channels.ElementsAs(ctx, &channels, false)...)
+	}
 
 	userGroup := slack.UserGroup{
-		Name:        name,
-		Description: description,
-		Handle:      handle,
+		Name:        data.Name.ValueString(),
+		Description: data.Description.ValueString(),
+		Handle:      data.Handle.ValueString(),
 		Prefs: slack.UserGroupPrefs{
-			Channels: schemaSetToSlice(channels),
+			Channels: channels,
 		},
 	}
-	createdUserGroup, err := client.CreateUserGroupContext(ctx, userGroup)
+
+	createdUserGroup, err := r.client.CreateUserGroupContext(ctx, userGroup)
 	if err != nil {
-		if err.Error() != "name_already_exists" && err.Error() != "handle_already_exists" {
-			return diag.Errorf("could not create usergroup %s: %s", name, err)
-		}
-		group, err := findUserGroupByName(ctx, name, true, m)
-		if err != nil {
-			return diag.Errorf("could not find usergroup %s: %s", name, err)
-		}
-		_, err = client.EnableUserGroupContext(ctx, group.ID)
-		if err != nil {
-			if err.Error() != "already_enabled" {
-				return diag.Errorf("could not enable usergroup %s (%s): %s", name, group.ID, err)
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create usergroup: %s", err))
+		return
+	}
+
+	data.ID = types.StringValue(createdUserGroup.ID)
+
+	// Update members if specified
+	if !data.Users.IsNull() {
+		var users []string
+		resp.Diagnostics.Append(data.Users.ElementsAs(ctx, &users, false)...)
+		if len(users) > 0 {
+			_, err := r.client.UpdateUserGroupMembersContext(ctx, createdUserGroup.ID, strings.Join(users, ","))
+			if err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup members: %s", err))
+				return
 			}
 		}
-		_, err = client.UpdateUserGroupContext(ctx, group.ID)
-		if err != nil {
-			return diag.Errorf("could not update usergroup %s (%s): %s", name, group.ID, err)
-		}
-		d.SetId(group.ID)
-	} else {
-		d.SetId(createdUserGroup.ID)
 	}
 
-	if users.Len() > 0 {
-		_, err := client.UpdateUserGroupMembersContext(ctx, d.Id(), strings.Join(schemaSetToSlice(users), ","))
-		if err != nil {
-			return diag.Errorf("could not update usergroup members %s: %s", name, err)
-		}
-		schemaSetToSlice(users)
-	}
-	return resourceSlackUserGroupRead(ctx, d, m)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func resourceSlackUserGroupRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*slack.Client)
-	id := d.Id()
-	var diags diag.Diagnostics
-	userGroups, err := client.GetUserGroupsContext(ctx, slack.GetUserGroupsOptionIncludeUsers(true))
+func (r *UsergroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data UsergroupResourceModel
+
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	userGroups, err := r.client.GetUserGroupsContext(ctx, slack.GetUserGroupsOptionIncludeUsers(true))
 	if err != nil {
-		return diag.FromErr(fmt.Errorf("couldn't get usergroups: %w", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read usergroups: %s", err))
+		return
 	}
 
-	for _, userGroup := range userGroups {
-		if userGroup.ID == id {
-			return updateUserGroupData(d, userGroup)
-		}
-	}
-	diags = append(diags, diag.Diagnostic{
-		Severity: diag.Warning,
-		Summary:  fmt.Sprintf("usergroup with ID %s not found, removing from state", id),
-	})
-	d.SetId("")
-	return diags
-}
+	found := false
+	for _, ug := range userGroups {
+		if ug.ID == data.ID.ValueString() {
+			data.Name = types.StringValue(ug.Name)
+			data.Handle = types.StringValue(ug.Handle)
+			data.Description = types.StringValue(ug.Description)
 
-func findUserGroupByName(ctx context.Context, name string, includeDisabled bool, m interface{}) (slack.UserGroup, error) {
-	client := m.(*slack.Client)
-	userGroups, err := client.GetUserGroupsContext(ctx, slack.GetUserGroupsOptionIncludeDisabled(includeDisabled), slack.GetUserGroupsOptionIncludeUsers(true))
-	if err != nil {
-		return slack.UserGroup{}, err
-	}
+			channelSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Prefs.Channels)
+			resp.Diagnostics.Append(diags...)
+			data.Channels = channelSet
 
-	for _, userGroup := range userGroups {
-		if userGroup.Name == name {
-			return userGroup, nil
+			userSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Users)
+			resp.Diagnostics.Append(diags...)
+			data.Users = userSet
+
+			found = true
+			break
 		}
 	}
 
-	return slack.UserGroup{}, fmt.Errorf("could not find usergroup %s", name)
-}
-
-func findUserGroupByID(ctx context.Context, id string, includeDisabled bool, m interface{}) (slack.UserGroup, error) {
-	client := m.(*slack.Client)
-	userGroups, err := client.GetUserGroupsContext(ctx, slack.GetUserGroupsOptionIncludeDisabled(includeDisabled), slack.GetUserGroupsOptionIncludeUsers(true))
-	if err != nil {
-		return slack.UserGroup{}, err
+	if !found {
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
-	for _, userGroup := range userGroups {
-		if userGroup.ID == id {
-			return userGroup, nil
-		}
-	}
-
-	return slack.UserGroup{}, fmt.Errorf("could not find usergroup %s", id)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func resourceSlackUserGroupUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*slack.Client)
+func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data UsergroupResourceModel
 
-	id := d.Id()
-	name := d.Get("name").(string)
-	description := d.Get("description").(string)
-	handle := d.Get("handle").(string)
-	channels := d.Get("channels").(*schema.Set)
-	users := d.Get("users").(*schema.Set)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	updateUserGroupOptions := []slack.UpdateUserGroupsOption{
-		slack.UpdateUserGroupsOptionName(name),
-		slack.UpdateUserGroupsOptionChannels(schemaSetToSlice(channels)),
+	// Get channel IDs
+	var channels []string
+	if !data.Channels.IsNull() {
+		resp.Diagnostics.Append(data.Channels.ElementsAs(ctx, &channels, false)...)
+	}
+
+	description := data.Description.ValueString()
+	updateOptions := []slack.UpdateUserGroupsOption{
+		slack.UpdateUserGroupsOptionName(data.Name.ValueString()),
+		slack.UpdateUserGroupsOptionHandle(data.Handle.ValueString()),
 		slack.UpdateUserGroupsOptionDescription(&description),
-		slack.UpdateUserGroupsOptionHandle(handle),
-	}
-	_, err := client.UpdateUserGroupContext(ctx, id, updateUserGroupOptions...)
-	if err != nil {
-		return diag.Errorf("could not update usergroup %s: %s", name, err)
+		slack.UpdateUserGroupsOptionChannels(channels),
 	}
 
-	if d.HasChanges("users") {
-		_, err := client.UpdateUserGroupMembersContext(ctx, id, strings.Join(schemaSetToSlice(users), ","))
+	_, err := r.client.UpdateUserGroupContext(ctx, data.ID.ValueString(), updateOptions...)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup: %s", err))
+		return
+	}
+
+	// Update members
+	if !data.Users.IsNull() {
+		var users []string
+		resp.Diagnostics.Append(data.Users.ElementsAs(ctx, &users, false)...)
+		_, err := r.client.UpdateUserGroupMembersContext(ctx, data.ID.ValueString(), strings.Join(users, ","))
 		if err != nil {
-			return diag.Errorf("could not update usergroup members %s: %s", name, err)
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup members: %s", err))
+			return
 		}
-		schemaSetToSlice(users)
 	}
-	return resourceSlackUserGroupRead(ctx, d, m)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func resourceSlackUserGroupDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-	client := m.(*slack.Client)
+func (r *UsergroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data UsergroupResourceModel
 
-	id := d.Id()
-	_, err := client.DisableUserGroupContext(ctx, id)
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.client.DisableUserGroupContext(ctx, data.ID.ValueString())
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to disable usergroup: %s", err))
+		return
 	}
-
-	return diags
 }
 
-func updateUserGroupData(d *schema.ResourceData, userGroup slack.UserGroup) diag.Diagnostics {
-	if userGroup.ID == "" {
-		return diag.Errorf("error setting id: returned usergroup does not have an id")
-	}
-	d.SetId(userGroup.ID)
-
-	if err := d.Set("name", userGroup.Name); err != nil {
-		return diag.Errorf("error setting name: %s", err)
-	}
-
-	if err := d.Set("handle", userGroup.Handle); err != nil {
-		return diag.Errorf("error setting handle: %s", err)
-	}
-
-	if err := d.Set("description", userGroup.Description); err != nil {
-		return diag.Errorf("error setting description: %s", err)
-	}
-
-	if err := d.Set("channels", userGroup.Prefs.Channels); err != nil {
-		return diag.Errorf("error setting channels: %s", err)
-	}
-
-	if err := d.Set("users", userGroup.Users); err != nil {
-		return diag.Errorf("error setting users: %s", err)
-	}
-
-	return nil
+func (r *UsergroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

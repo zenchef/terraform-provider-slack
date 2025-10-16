@@ -3,55 +3,111 @@ package slack
 import (
 	"context"
 	"fmt"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/slack-go/slack"
 )
 
-// Provider returns a *schema.Provider
-func Provider() *schema.Provider {
-	return &schema.Provider{
-		Schema: map[string]*schema.Schema{
-			"token": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Sensitive:   true,
-				DefaultFunc: schema.EnvDefaultFunc("SLACK_TOKEN", nil),
-				Description: "The Slack token",
-			},
-		},
+// Ensure the implementation satisfies the provider.Provider interface
+var _ provider.Provider = &SlackProvider{}
 
-		ResourcesMap: map[string]*schema.Resource{
-			"slack_conversation": resourceSlackConversation(),
-			"slack_usergroup":    resourceSlackUserGroup(),
-		},
+// SlackProvider defines the provider implementation
+type SlackProvider struct {
+	// version is set to the provider version on release, "dev" when the
+	// provider is built and ran locally, and "test" when running acceptance testing.
+	version string
+}
 
-		DataSourcesMap: map[string]*schema.Resource{
-			"slack_conversation": dataSourceConversation(),
-			"slack_user":         dataSourceUser(),
-			"slack_usergroup":    dataSourceUserGroup(),
-		},
+// SlackProviderModel describes the provider data model
+type SlackProviderModel struct {
+	Token types.String `tfsdk:"token"`
+}
 
-		ConfigureContextFunc: providerConfigure,
+func NewFrameworkProvider(version string) func() provider.Provider {
+	return func() provider.Provider {
+		return &SlackProvider{
+			version: version,
+		}
 	}
 }
 
-func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	var diags diag.Diagnostics
+func (p *SlackProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "slack"
+	resp.Version = p.version
+}
 
-	token, ok := d.GetOk("token")
-	if !ok {
-		return nil, diag.Errorf("could not create slack client. Please provide a token.")
+func (p *SlackProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"token": schema.StringAttribute{
+				MarkdownDescription: "The Slack token",
+				Optional:            true,
+				Sensitive:           true,
+			},
+		},
+	}
+}
+
+func (p *SlackProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var data SlackProviderModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	tokenStr := token.(string)
-	if err := validateSlackToken(tokenStr); err != nil {
-		return nil, diag.FromErr(err)
+	// Configuration values are now available
+	// Get token from configuration or environment variable
+	token := os.Getenv("SLACK_TOKEN")
+	if !data.Token.IsNull() {
+		token = data.Token.ValueString()
 	}
 
-	slackClient := slack.New(tokenStr)
-	return slackClient, diags
+	if token == "" {
+		resp.Diagnostics.AddError(
+			"Missing Slack Token Configuration",
+			"While configuring the provider, the Slack token was not found. "+
+				"Please set the SLACK_TOKEN environment variable or configure the token in the provider configuration.",
+		)
+		return
+	}
+
+	// Validate token format
+	if err := validateSlackToken(token); err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Slack Token",
+			fmt.Sprintf("The provided Slack token is invalid: %s", err.Error()),
+		)
+		return
+	}
+
+	// Create Slack client
+	slackClient := slack.New(token)
+
+	// Make the Slack client available during DataSource and Resource type Configure methods
+	resp.DataSourceData = slackClient
+	resp.ResourceData = slackClient
+}
+
+func (p *SlackProvider) Resources(ctx context.Context) []func() resource.Resource {
+	return []func() resource.Resource{
+		NewConversationResource,
+		NewUsergroupResource,
+	}
+}
+
+func (p *SlackProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{
+		NewConversationDataSource,
+		NewUserDataSource,
+		NewUsergroupDataSource,
+	}
 }
 
 func validateSlackToken(token string) error {
@@ -82,22 +138,4 @@ func validateSlackToken(token string) error {
 	}
 
 	return nil
-}
-
-func schemaSetToSlice(set *schema.Set) []string {
-	s := make([]string, len(set.List()))
-	for i, v := range set.List() {
-		s[i] = v.(string)
-	}
-	return s
-}
-
-func remove(s []string, r string) []string {
-	result := make([]string, 0, len(s))
-	for _, v := range s {
-		if v != r {
-			result = append(result, v)
-		}
-	}
-	return result
 }

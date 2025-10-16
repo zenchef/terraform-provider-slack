@@ -4,97 +4,112 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/slack-go/slack"
 )
 
-func dataSourceConversation() *schema.Resource {
-	return &schema.Resource{
-		ReadContext: dataSourceSlackConversationRead,
+var _ datasource.DataSource = &ConversationDataSource{}
 
-		Schema: map[string]*schema.Schema{
-			"channel_id": {
-				Type:     schema.TypeString,
-				Optional: true,
+func NewConversationDataSource() datasource.DataSource {
+	return &ConversationDataSource{}
+}
+
+type ConversationDataSource struct {
+	client *slack.Client
+}
+
+type ConversationDataSourceModel struct {
+	ID        types.String `tfsdk:"id"`
+	Name      types.String `tfsdk:"name"`
+	Topic     types.String `tfsdk:"topic"`
+	Purpose   types.String `tfsdk:"purpose"`
+	Created   types.Int64  `tfsdk:"created"`
+	Creator   types.String `tfsdk:"creator"`
+	IsPrivate types.Bool   `tfsdk:"is_private"`
+}
+
+func (d *ConversationDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_conversation"
+}
+
+func (d *ConversationDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Fetches information about a Slack conversation",
+
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The conversation ID to look up",
+				Required:            true,
 			},
-			"name": {
-				Type:     schema.TypeString,
-				Optional: true,
+			"name": schema.StringAttribute{
+				MarkdownDescription: "The conversation name",
+				Computed:            true,
 			},
-			"is_private": {
-				Type:     schema.TypeBool,
-				Optional: true,
+			"topic": schema.StringAttribute{
+				MarkdownDescription: "The conversation topic",
+				Computed:            true,
 			},
-			"topic": {
-				Type:     schema.TypeString,
-				Computed: true,
+			"purpose": schema.StringAttribute{
+				MarkdownDescription: "The conversation purpose",
+				Computed:            true,
 			},
-			"purpose": {
-				Type:     schema.TypeString,
-				Computed: true,
+			"created": schema.Int64Attribute{
+				MarkdownDescription: "Timestamp when the conversation was created",
+				Computed:            true,
 			},
-			"created": {
-				Type:     schema.TypeInt,
-				Computed: true,
+			"creator": schema.StringAttribute{
+				MarkdownDescription: "User ID of the conversation creator",
+				Computed:            true,
 			},
-			"creator": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"is_archived": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"is_shared": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"is_ext_shared": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"is_org_shared": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"is_general": {
-				Type:     schema.TypeBool,
-				Computed: true,
+			"is_private": schema.BoolAttribute{
+				MarkdownDescription: "Whether the conversation is private",
+				Computed:            true,
 			},
 		},
 	}
 }
 
-func dataSourceSlackConversationRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*slack.Client)
-	channelID := d.Get("channel_id").(string)
-	channelName := d.Get("name").(string)
-	isPrivate := d.Get("is_private").(bool)
-
-	var channel *slack.Channel
-	var err error
-	if channelID != "" {
-		channel, err = client.GetConversationInfoContext(ctx, &slack.GetConversationInfoInput{
-			ChannelID: channelID,
-		})
-		if err != nil {
-			return diag.FromErr(fmt.Errorf("couldn't get conversation info for %s: %w", channelID, err))
-		}
-	} else if channelName != "" {
-		channel, err = findExistingChannel(ctx, client, channelName, isPrivate)
-		if err != nil {
-			return diag.FromErr(fmt.Errorf("couldn't get conversation info for %s: %w", channelName, err))
-		}
-	} else {
-		return diag.FromErr(fmt.Errorf("channel_id or name must be set"))
+func (d *ConversationDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
 	}
 
-	users, _, err := client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
-		ChannelID: channel.ID,
+	client, ok := req.ProviderData.(*slack.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *slack.Client, got: %T", req.ProviderData),
+		)
+		return
+	}
+
+	d.client = client
+}
+
+func (d *ConversationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data ConversationDataSourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	channel, err := d.client.GetConversationInfoContext(ctx, &slack.GetConversationInfoInput{
+		ChannelID: data.ID.ValueString(),
 	})
 	if err != nil {
-		return diag.FromErr(fmt.Errorf("couldn't get users in conversation for %s: %w", channel.ID, err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read conversation: %s", err))
+		return
 	}
-	return updateChannelData(d, channel, users)
+
+	data.Name = types.StringValue(channel.Name)
+	data.Topic = types.StringValue(channel.Topic.Value)
+	data.Purpose = types.StringValue(channel.Purpose.Value)
+	data.Created = types.Int64Value(int64(channel.Created))
+	data.Creator = types.StringValue(channel.Creator)
+	data.IsPrivate = types.BoolValue(channel.IsPrivate)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
