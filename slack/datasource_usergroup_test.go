@@ -5,10 +5,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/slack-go/slack"
 )
 
@@ -16,11 +16,10 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 	resourceName := "slack_usergroup.test"
 	dataSourceName := "data.slack_usergroup.test"
 
-	var providers []*schema.Provider
 	t.Run("search non-existent by ID", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserGroupDataSourceConfigNonExistentID,
@@ -33,7 +32,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 	t.Run("search non-existent by name", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserGroupDataSourceConfigNonExistentName,
@@ -46,7 +45,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 	t.Run("search without setting any field", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserGroupDataSourceConfigMissingFields,
@@ -63,7 +62,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 		createUserGroup := testAccSlackUserGroupWithUsers(name, []string{channel.ID}, users)
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserGroupDataSourceConfigByNameAndID(createUserGroup),
@@ -80,7 +79,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 		createUserGroup := testAccSlackUserGroupWithUsers(name, []string{channel.ID}, users)
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config: testAccCheckSlackUserGroupDataSourceConfigByID(createUserGroup),
@@ -105,7 +104,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 		createUserGroup := testAccSlackUserGroupWithUsers(name, []string{channel.ID}, users)
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config: testAccCheckSlackUserGroupDataSourceConfigByName(createUserGroup),

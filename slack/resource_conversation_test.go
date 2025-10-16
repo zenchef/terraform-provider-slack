@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/require"
 )
@@ -141,7 +141,6 @@ func TestAccSlackConversationTest(t *testing.T) {
 }
 
 func testSlackConversationUpdate(t *testing.T, resourceName string, createChannel slack.Channel, updateChannel *slack.Channel) {
-	var providers []*schema.Provider
 	steps := []resource.TestStep{
 		{
 			Config: testAccSlackConversationConfig(createChannel),
@@ -174,7 +173,7 @@ func testSlackConversationUpdate(t *testing.T, resourceName string, createChanne
 			testAccPreCheck(t)
 		},
 		IDRefreshName:     resourceName,
-		ProviderFactories: testAccProviderFactories(&providers),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:      testAccCheckConversationDestroy,
 		Steps:             steps,
 	})

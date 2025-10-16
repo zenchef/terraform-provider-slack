@@ -5,21 +5,20 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Parallel()
 	dataSourceName := "data.slack_user.test"
 
-	var providers []*schema.Provider
 
 	t.Run("search non-existent user by name", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserDataSourceConfigNonExistentByName,
@@ -32,7 +31,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Run("search non-existent user by email", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserDataSourceConfigNonExistentByEmail,
@@ -45,7 +44,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Run("search without setting any field", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserDataSourceConfigMissingFields,
@@ -58,7 +57,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Run("search by name and email", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserDataSourceConfigExistentByNameAndEmail,
@@ -71,7 +70,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Run("search by name", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config: testAccCheckSlackUserDataSourceConfigExistentByName,
@@ -89,7 +88,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Run("search by email", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
 			PreCheck:          func() { testAccPreCheck(t) },
-			ProviderFactories: testAccProviderFactories(&providers),
+			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
 					Config: testAccCheckSlackUserDataSourceConfigExistentByEmail,

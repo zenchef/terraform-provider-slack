@@ -5,15 +5,14 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/slack-go/slack"
 )
 
 func TestAccSlackConversationDataSource_basic(t *testing.T) {
-	var providers []*schema.Provider
 
 	nameByID := acctest.RandomWithPrefix("test-acc-slack-conversation-test")
 	resourceNameByID := fmt.Sprintf("slack_conversation.%s", nameByID)
@@ -29,7 +28,7 @@ func TestAccSlackConversationDataSource_basic(t *testing.T) {
 
 	resource.ParallelTest(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		ProviderFactories: testAccProviderFactories(&providers),
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config:      testAccCheckSlackConversationDataSourceConfigNonExistent,
