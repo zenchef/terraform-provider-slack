@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -15,6 +16,7 @@ func Provider() *schema.Provider {
 			"token": {
 				Type:        schema.TypeString,
 				Required:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("SLACK_TOKEN", nil),
 				Description: "The Slack token",
 			},
@@ -42,8 +44,44 @@ func providerConfigure(_ context.Context, d *schema.ResourceData) (interface{}, 
 	if !ok {
 		return nil, diag.Errorf("could not create slack client. Please provide a token.")
 	}
-	slackClient := slack.New(token.(string))
+
+	tokenStr := token.(string)
+	if err := validateSlackToken(tokenStr); err != nil {
+		return nil, diag.FromErr(err)
+	}
+
+	slackClient := slack.New(tokenStr)
 	return slackClient, diags
+}
+
+func validateSlackToken(token string) error {
+	if token == "" {
+		return fmt.Errorf("token cannot be empty")
+	}
+
+	// Validate Slack token format
+	// Common Slack token prefixes:
+	// xoxb- : Bot tokens
+	// xoxp- : User tokens
+	// xoxa- : App-level tokens (deprecated)
+	// xoxe- : Enterprise Grid tokens
+	// xoxr- : Refresh tokens
+	// xapp- : App tokens
+	validPrefixes := []string{"xoxb-", "xoxp-", "xoxa-", "xoxe-", "xoxr-", "xapp-"}
+
+	hasValidPrefix := false
+	for _, prefix := range validPrefixes {
+		if len(token) >= len(prefix) && token[:len(prefix)] == prefix {
+			hasValidPrefix = true
+			break
+		}
+	}
+
+	if !hasValidPrefix {
+		return fmt.Errorf("invalid token format. Slack tokens must start with one of: xoxb-, xoxp-, xoxa-, xoxe-, xoxr-, xapp-")
+	}
+
+	return nil
 }
 
 func schemaSetToSlice(set *schema.Set) []string {
@@ -55,10 +93,11 @@ func schemaSetToSlice(set *schema.Set) []string {
 }
 
 func remove(s []string, r string) []string {
-	for i, v := range s {
-		if v == r {
-			return append(s[:i], s[i+1:]...)
+	result := make([]string, 0, len(s))
+	for _, v := range s {
+		if v != r {
+			result = append(result, v)
 		}
 	}
-	return s
+	return result
 }
