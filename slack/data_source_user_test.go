@@ -13,10 +13,9 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 	t.Parallel()
 	dataSourceName := "data.slack_user.test"
 
-
 	t.Run("search non-existent user by name", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -29,7 +28,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 
 	t.Run("search non-existent user by email", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -42,7 +41,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 
 	t.Run("search without setting any field", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -55,7 +54,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 
 	t.Run("search by name and email", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -68,7 +67,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 
 	t.Run("search by name", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -86,7 +85,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 
 	t.Run("search by email", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{

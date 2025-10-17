@@ -71,7 +71,7 @@ func getTestSlackClient() *slack.Client {
 // archiveConversationWithContext archives a conversation/channel
 func archiveConversationWithContext(ctx context.Context, client *slack.Client, channelID string) error {
 	err := client.ArchiveConversationContext(ctx, channelID)
-	if err != nil && err.Error() != "already_archived" && err.Error() != "channel_not_found" {
+	if err != nil && err.Error() != errAlreadyArchived && err.Error() != errChannelNotFound {
 		return err
 	}
 	return nil

@@ -1,11 +1,14 @@
+version: "2"
+
+run:
+  timeout: 5m
+
 linters:
+  default: none
   enable:
-    - goimports
-    - revive
-    - gomnd
-    - gofmt
-    - dupl
-    - misspell
-    - goconst
-    - whitespace
     - govet
+    - revive
+
+formatters:
+  enable:
+    - gofmt

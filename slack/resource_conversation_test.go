@@ -48,7 +48,7 @@ func init() {
 					if strings.HasPrefix(channel.Name, conversationNamePrefix) {
 						err := c.ArchiveConversationContext(context.Background(), channel.ID)
 						if err != nil {
-							if err.Error() != "already_archived" {
+							if err.Error() != errAlreadyArchived {
 								sweeperErr := fmt.Errorf("archiving channel %s during sweep: %s", channel.Name, err)
 								log.Printf("[ERROR] %s", sweeperErr)
 								sweeperErrs = multierror.Append(sweeperErrs, err)
@@ -171,10 +171,10 @@ func testSlackConversationUpdate(t *testing.T, resourceName string, createChanne
 		PreCheck: func() {
 			testAccPreCheck(t)
 		},
-		IDRefreshName:     resourceName,
+		IDRefreshName:            resourceName,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:      testAccCheckConversationDestroy,
-		Steps:             steps,
+		CheckDestroy:             testAccCheckConversationDestroy,
+		Steps:                    steps,
 	})
 }
 

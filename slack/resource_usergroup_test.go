@@ -143,10 +143,10 @@ func testSlackUserGroupUpdate(t *testing.T, resourceName string, createChannel s
 		PreCheck: func() {
 			testAccPreCheck(t)
 		},
-		IDRefreshName:     resourceName,
+		IDRefreshName:            resourceName,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:      testAccCheckUserGroupDestroy,
-		Steps:             steps,
+		CheckDestroy:             testAccCheckUserGroupDestroy,
+		Steps:                    steps,
 	})
 }
 

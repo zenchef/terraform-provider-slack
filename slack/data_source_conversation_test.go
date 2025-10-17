@@ -12,7 +12,6 @@ import (
 )
 
 func TestAccSlackConversationDataSource_basic(t *testing.T) {
-
 	nameByID := acctest.RandomWithPrefix("test-acc-slack-conversation-test")
 	resourceNameByID := fmt.Sprintf("slack_conversation.%s", nameByID)
 	dataSourceNameByID := fmt.Sprintf("data.slack_conversation.%s", nameByID)
@@ -26,7 +25,7 @@ func TestAccSlackConversationDataSource_basic(t *testing.T) {
 	createChannelByName := testAccSlackConversationWithMembers(nameByName, membersByName)
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{

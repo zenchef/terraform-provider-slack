@@ -1,3 +1,4 @@
+// Package slack provides Terraform resources and data sources for managing Slack workspaces.
 package slack
 
 import (
@@ -12,14 +13,17 @@ import (
 
 var _ datasource.DataSource = &ConversationDataSource{}
 
+// NewConversationDataSource creates a new Slack conversation data source.
 func NewConversationDataSource() datasource.DataSource {
 	return &ConversationDataSource{}
 }
 
+// ConversationDataSource implements the Slack conversation data source.
 type ConversationDataSource struct {
 	client *slack.Client
 }
 
+// ConversationDataSourceModel describes the data source data model.
 type ConversationDataSourceModel struct {
 	ID        types.String `tfsdk:"id"`
 	Name      types.String `tfsdk:"name"`
@@ -30,11 +34,13 @@ type ConversationDataSourceModel struct {
 	IsPrivate types.Bool   `tfsdk:"is_private"`
 }
 
-func (d *ConversationDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+// Metadata returns the data source type name.
+func (d *ConversationDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_conversation"
 }
 
-func (d *ConversationDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+// Schema defines the schema for the data source.
+func (d *ConversationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Fetches information about a Slack conversation",
 
@@ -71,7 +77,8 @@ func (d *ConversationDataSource) Schema(ctx context.Context, req datasource.Sche
 	}
 }
 
-func (d *ConversationDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+// Configure adds the provider configured client to the data source.
+func (d *ConversationDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
