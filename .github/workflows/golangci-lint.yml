@@ -14,10 +14,10 @@ jobs:
         with:
           go-version: '1.25'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.64
+          # Version 2.5.0 supports Go 1.25 (released Sep 2025)
+          version: v2.5
 
           # Optional: working directory, useful for monorepos
           # working-directory: test

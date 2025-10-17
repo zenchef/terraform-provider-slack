@@ -54,10 +54,12 @@ type ConversationResourceModel struct {
 	AdoptExistingChannel           types.Bool   `tfsdk:"adopt_existing_channel"`
 }
 
+// Metadata returns the resource type name.
 func (r *ConversationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_conversation"
 }
 
+// Schema defines the schema for the resource.
 func (r *ConversationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Slack conversation (channel)",
@@ -145,6 +147,7 @@ func (r *ConversationResource) Schema(_ context.Context, _ resource.SchemaReques
 	}
 }
 
+// Configure adds the provider configured client to the resource.
 func (r *ConversationResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return

@@ -1,9 +1,14 @@
+version: "2"
+
 run:
   timeout: 5m
 
 linters:
-  disable-all: true
+  default: none
   enable:
-    - gofmt
     - govet
     - revive
+
+formatters:
+  enable:
+    - gofmt

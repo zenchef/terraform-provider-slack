@@ -35,10 +35,12 @@ type UsergroupResourceModel struct {
 	Users       types.Set    `tfsdk:"users"`
 }
 
+// Metadata returns the resource type name.
 func (r *UsergroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_usergroup"
 }
 
+// Schema defines the schema for the resource.
 func (r *UsergroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Slack usergroup",
@@ -76,6 +78,7 @@ func (r *UsergroupResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	}
 }
 
+// Configure adds the provider configured client to the resource.
 func (r *UsergroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
