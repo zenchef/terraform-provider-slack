@@ -15,16 +15,20 @@ download:
 
 lint: vet docs-lint
 	@echo "==> Checking source code against linters..."
-	golangci-lint run -v
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run -v; \
+	else \
+		echo "golangci-lint not found, skipping (runs separately in CI)"; \
+	fi
 
 sweep:
 	@echo "WARNING: This will destroy infrastructure. Use only in development accounts."
 	go test $(SWEEP_DIR) -v -sweep=$(SWEEP) $(SWEEPARGS) -timeout 60m
 
-test: lint
+test: vet
 	go test -v $(TEST)
 
-testacc: lint
+testacc: vet
 	@echo "==> Running acceptance tests..."
 	TF_ACC=1 go test -v $(TEST)
 
