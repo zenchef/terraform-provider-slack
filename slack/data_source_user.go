@@ -15,24 +15,29 @@ import (
 
 var _ datasource.DataSource = &UserDataSource{}
 
+// NewUserDataSource creates a new Slack user data source.
 func NewUserDataSource() datasource.DataSource {
 	return &UserDataSource{}
 }
 
+// UserDataSource implements the Slack user data source.
 type UserDataSource struct {
 	client *slack.Client
 }
 
+// UserDataSourceModel describes the data source data model.
 type UserDataSourceModel struct {
 	ID    types.String `tfsdk:"id"`
 	Name  types.String `tfsdk:"name"`
 	Email types.String `tfsdk:"email"`
 }
 
+// Metadata returns the data source type name.
 func (d *UserDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_user"
 }
 
+// Schema defines the schema for the data source.
 func (d *UserDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Fetches information about a Slack user",
@@ -60,6 +65,7 @@ func (d *UserDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 	}
 }
 
+// Configure adds the provider configured client to the data source.
 func (d *UserDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return

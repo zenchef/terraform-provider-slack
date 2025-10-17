@@ -26,7 +26,7 @@ func TestAccSlackConversationDataSource_basic(t *testing.T) {
 	createChannelByName := testAccSlackConversationWithMembers(nameByName, membersByName)
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccPreCheck(t) },
+		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{

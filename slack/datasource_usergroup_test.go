@@ -17,7 +17,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 
 	t.Run("search non-existent by ID", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -30,7 +30,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 
 	t.Run("search non-existent by name", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -43,7 +43,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 
 	t.Run("search without setting any field", func(t *testing.T) {
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -60,7 +60,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 		channel := createTestConversation(t)
 		createUserGroup := testAccSlackUserGroupWithUsers(name, []string{channel.ID}, users)
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -77,7 +77,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 		channel := createTestConversation(t)
 		createUserGroup := testAccSlackUserGroupWithUsers(name, []string{channel.ID}, users)
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
@@ -102,7 +102,7 @@ func TestAccSlackUserGroupDataSource_basic(t *testing.T) {
 		channel := createTestConversation(t)
 		createUserGroup := testAccSlackUserGroupWithUsers(name, []string{channel.ID}, users)
 		resource.ParallelTest(t, resource.TestCase{
-			PreCheck:          func() { testAccPreCheck(t) },
+			PreCheck:                 func() { testAccPreCheck(t) },
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{

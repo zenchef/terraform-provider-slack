@@ -15,6 +15,11 @@ import (
 	"github.com/slack-go/slack"
 )
 
+const (
+	errChannelNotFound = "channel_not_found"
+	errAlreadyArchived = "already_archived"
+)
+
 // Ensure provider defined types fully satisfy framework interfaces
 var _ resource.Resource = &ConversationResource{}
 var _ resource.ResourceWithImportState = &ConversationResource{}
@@ -30,22 +35,22 @@ type ConversationResource struct {
 
 // ConversationResourceModel describes the resource data model
 type ConversationResourceModel struct {
-	ID                                  types.String `tfsdk:"id"`
-	Name                                types.String `tfsdk:"name"`
-	Topic                               types.String `tfsdk:"topic"`
-	Purpose                             types.String `tfsdk:"purpose"`
-	PermanentMembers                    types.Set    `tfsdk:"permanent_members"`
-	Created                             types.Int64  `tfsdk:"created"`
-	Creator                             types.String `tfsdk:"creator"`
-	IsPrivate                           types.Bool   `tfsdk:"is_private"`
-	IsArchived                          types.Bool   `tfsdk:"is_archived"`
-	IsShared                            types.Bool   `tfsdk:"is_shared"`
-	IsExtShared                         types.Bool   `tfsdk:"is_ext_shared"`
-	IsOrgShared                         types.Bool   `tfsdk:"is_org_shared"`
-	IsGeneral                           types.Bool   `tfsdk:"is_general"`
-	ActionOnDestroy                     types.String `tfsdk:"action_on_destroy"`
-	ActionOnUpdatePermanentMembers      types.String `tfsdk:"action_on_update_permanent_members"`
-	AdoptExistingChannel                types.Bool   `tfsdk:"adopt_existing_channel"`
+	ID                             types.String `tfsdk:"id"`
+	Name                           types.String `tfsdk:"name"`
+	Topic                          types.String `tfsdk:"topic"`
+	Purpose                        types.String `tfsdk:"purpose"`
+	PermanentMembers               types.Set    `tfsdk:"permanent_members"`
+	Created                        types.Int64  `tfsdk:"created"`
+	Creator                        types.String `tfsdk:"creator"`
+	IsPrivate                      types.Bool   `tfsdk:"is_private"`
+	IsArchived                     types.Bool   `tfsdk:"is_archived"`
+	IsShared                       types.Bool   `tfsdk:"is_shared"`
+	IsExtShared                    types.Bool   `tfsdk:"is_ext_shared"`
+	IsOrgShared                    types.Bool   `tfsdk:"is_org_shared"`
+	IsGeneral                      types.Bool   `tfsdk:"is_general"`
+	ActionOnDestroy                types.String `tfsdk:"action_on_destroy"`
+	ActionOnUpdatePermanentMembers types.String `tfsdk:"action_on_update_permanent_members"`
+	AdoptExistingChannel           types.Bool   `tfsdk:"adopt_existing_channel"`
 }
 
 func (r *ConversationResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -238,7 +243,7 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 		ChannelID: data.ID.ValueString(),
 	})
 	if err != nil {
-		if err.Error() == "channel_not_found" {
+		if err.Error() == errChannelNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -329,7 +334,7 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	// Update archived status if changed
 	if !data.IsArchived.Equal(state.IsArchived) {
 		if data.IsArchived.ValueBool() {
-			if err := r.client.ArchiveConversationContext(ctx, id); err != nil && err.Error() != "already_archived" {
+			if err := r.client.ArchiveConversationContext(ctx, id); err != nil && err.Error() != errAlreadyArchived {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
 				return
 			}
@@ -439,7 +444,7 @@ func (r *ConversationResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	action := data.ActionOnDestroy.ValueString()
 	if action == "archive" {
-		if err := r.client.ArchiveConversationContext(ctx, data.ID.ValueString()); err != nil && err.Error() != "already_archived" && err.Error() != "channel_not_found" {
+		if err := r.client.ArchiveConversationContext(ctx, data.ID.ValueString()); err != nil && err.Error() != errAlreadyArchived && err.Error() != errChannelNotFound {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
 			return
 		}
