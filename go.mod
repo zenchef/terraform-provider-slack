@@ -1,4 +1,4 @@
-module github.com/pablovarela/terraform-provider-slack
+module github.com/zenchef/terraform-provider-slack
 
 go 1.25
 
