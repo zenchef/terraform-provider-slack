@@ -1,8 +1,10 @@
+version: "2"
+
 linters:
-  enable:
+  default:
     - goimports
     - revive
-    - gomnd
+    - mnd
     - gofmt
     - dupl
     - misspell
