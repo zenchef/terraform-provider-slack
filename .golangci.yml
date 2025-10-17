@@ -8,5 +8,4 @@ linters:
     - goconst
     - whitespace
     - govet
-    - goimports
     - gofmt
