@@ -186,6 +186,10 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 	data.Created = types.Int64Value(int64(channel.Created))
 	data.IsPrivate = types.BoolValue(channel.IsPrivate)
 	data.IsGeneral = types.BoolValue(channel.IsGeneral)
+	data.IsShared = types.BoolValue(channel.IsShared)
+	data.IsExtShared = types.BoolValue(channel.IsExtShared)
+	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
+	data.IsArchived = types.BoolValue(channel.IsArchived)
 
 	// Set optional fields if provided
 	if !data.Topic.IsNull() && data.Topic.ValueString() != "" {
@@ -199,6 +203,22 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 		if _, err := r.client.SetPurposeOfConversationContext(ctx, channel.ID, data.Purpose.ValueString()); err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set conversation purpose: %s", err))
 			return
+		}
+	}
+
+	// Handle permanent members
+	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
+		var members []string
+		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &members, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		for _, userID := range members {
+			if _, err := r.client.InviteUsersToConversationContext(ctx, channel.ID, userID); err != nil {
+				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to invite user %s to conversation: %s", userID, err))
+				return
+			}
 		}
 	}
 
@@ -238,6 +258,33 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 	data.IsGeneral = types.BoolValue(channel.IsGeneral)
 	data.Created = types.Int64Value(int64(channel.Created))
 	data.Creator = types.StringValue(channel.Creator)
+
+	// Get channel members if permanent_members is set in state
+	if !data.PermanentMembers.IsNull() {
+		members, _, err := r.client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
+			ChannelID: data.ID.ValueString(),
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get users in conversation: %s", err))
+			return
+		}
+
+		// Filter out the creator from the members list
+		var permanentMembers []string
+		creator := channel.Creator
+		for _, member := range members {
+			if member != creator {
+				permanentMembers = append(permanentMembers, member)
+			}
+		}
+
+		memberSet, diags := types.SetValueFrom(ctx, types.StringType, permanentMembers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		data.PermanentMembers = memberSet
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -294,6 +341,90 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 
+	// Update permanent members if changed
+	if !data.PermanentMembers.Equal(state.PermanentMembers) {
+		var newMembers, oldMembers []string
+
+		if !data.PermanentMembers.IsNull() {
+			resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &newMembers, false)...)
+		}
+		if !state.PermanentMembers.IsNull() {
+			resp.Diagnostics.Append(state.PermanentMembers.ElementsAs(ctx, &oldMembers, false)...)
+		}
+
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Find users to add (in new but not in old)
+		for _, userID := range newMembers {
+			if !contains(oldMembers, userID) {
+				if _, err := r.client.InviteUsersToConversationContext(ctx, id, userID); err != nil {
+					resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to invite user %s to conversation: %s", userID, err))
+					return
+				}
+			}
+		}
+
+		// Find users to remove (in old but not in new)
+		action := data.ActionOnUpdatePermanentMembers.ValueString()
+		if action == "kick" {
+			for _, userID := range oldMembers {
+				if !contains(newMembers, userID) {
+					if err := r.client.KickUserFromConversationContext(ctx, id, userID); err != nil {
+						resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to kick user %s from conversation: %s", userID, err))
+						return
+					}
+				}
+			}
+		}
+	}
+
+	// Refresh state from Slack to ensure it's accurate
+	channel, err := r.client.GetConversationInfoContext(ctx, &slack.GetConversationInfoInput{
+		ChannelID: id,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read conversation after update: %s", err))
+		return
+	}
+
+	// Update computed fields with actual values from Slack
+	data.Name = types.StringValue(channel.Name)
+	data.Topic = types.StringValue(channel.Topic.Value)
+	data.Purpose = types.StringValue(channel.Purpose.Value)
+	data.IsArchived = types.BoolValue(channel.IsArchived)
+	data.IsShared = types.BoolValue(channel.IsShared)
+	data.IsExtShared = types.BoolValue(channel.IsExtShared)
+	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
+
+	// Get channel members if permanent_members is set
+	if !data.PermanentMembers.IsNull() {
+		members, _, err := r.client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
+			ChannelID: id,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get users in conversation: %s", err))
+			return
+		}
+
+		// Filter out the creator from the members list
+		var permanentMembers []string
+		creator := channel.Creator
+		for _, member := range members {
+			if member != creator {
+				permanentMembers = append(permanentMembers, member)
+			}
+		}
+
+		memberSet, diags := types.SetValueFrom(ctx, types.StringType, permanentMembers)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		data.PermanentMembers = memberSet
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -317,4 +448,14 @@ func (r *ConversationResource) Delete(ctx context.Context, req resource.DeleteRe
 
 func (r *ConversationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// contains checks if a string is in a slice
+func contains(s []string, e string) bool {
+	for _, x := range s {
+		if x == e {
+			return true
+		}
+	}
+	return false
 }

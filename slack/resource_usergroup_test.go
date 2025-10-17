@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/require"
@@ -170,7 +169,7 @@ func testCheckSlackUserGroupAttributes(t *testing.T, resourceName string, expect
 		}
 
 		primary := rs.Primary
-		group, err := findUserGroupByID(context.Background(), primary.ID, false, testAccProvider.Meta())
+		group, err := findUserGroupByID(context.Background(), primary.ID, false, getTestSlackClient())
 		if err != nil {
 			return fmt.Errorf("couldn't get conversation info for %s: %s", primary.ID, err)
 		}
@@ -220,7 +219,7 @@ func testAccSlackUserGroupWithUsers(name string, channels, users []string) slack
 }
 
 func testAccCheckUserGroupDestroy(s *terraform.State) error {
-	c := testAccProvider.Meta().(*slack.Client)
+	c := getTestSlackClient()
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "slack_usergroup" {
 			continue

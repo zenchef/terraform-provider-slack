@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/require"
@@ -202,7 +201,7 @@ func testCheckSlackChannelAttributes(t *testing.T, resourceName string, expected
 			return fmt.Errorf("not found: %s", resourceName)
 		}
 
-		c := testAccProvider.Meta().(*slack.Client)
+		c := getTestSlackClient()
 		primary := rs.Primary
 		channel, err := c.GetConversationInfo(&slack.GetConversationInfoInput{
 			ChannelID: primary.ID,
@@ -292,7 +291,7 @@ func testAccSlackConversationWithMembers(channelName string, members []string) s
 }
 
 func testAccCheckConversationDestroy(s *terraform.State) error {
-	c := testAccProvider.Meta().(*slack.Client)
+	c := getTestSlackClient()
 	for _, rs := range s.RootModule().Resources {
 		if rs.Type != "slack_conversation" {
 			continue
