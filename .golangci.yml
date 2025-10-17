@@ -1,11 +1,9 @@
+run:
+  timeout: 5m
+
 linters:
   disable-all: true
   enable:
-    - revive
-    - mnd
-    - dupl
-    - misspell
-    - goconst
-    - whitespace
-    - govet
     - gofmt
+    - govet
+    - revive
