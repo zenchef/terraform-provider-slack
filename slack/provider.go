@@ -14,34 +14,37 @@ import (
 )
 
 // Ensure the implementation satisfies the provider.Provider interface
-var _ provider.Provider = &SlackProvider{}
+var _ provider.Provider = &Provider{}
 
-// SlackProvider defines the provider implementation
-type SlackProvider struct {
+// Provider defines the provider implementation.
+type Provider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance testing.
 	version string
 }
 
-// SlackProviderModel describes the provider data model
-type SlackProviderModel struct {
+// ProviderModel describes the provider data model.
+type ProviderModel struct {
 	Token types.String `tfsdk:"token"`
 }
 
+// NewFrameworkProvider creates a new Slack provider factory function.
 func NewFrameworkProvider(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &SlackProvider{
+		return &Provider{
 			version: version,
 		}
 	}
 }
 
-func (p *SlackProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+// Metadata returns the provider type name and version.
+func (p *Provider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "slack"
 	resp.Version = p.version
 }
 
-func (p *SlackProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+// Schema defines the provider-level schema for configuration data.
+func (p *Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"token": schema.StringAttribute{
@@ -53,8 +56,9 @@ func (p *SlackProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 	}
 }
 
-func (p *SlackProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data SlackProviderModel
+// Configure prepares a Slack API client for data sources and resources.
+func (p *Provider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var data ProviderModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
@@ -95,14 +99,16 @@ func (p *SlackProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	resp.ResourceData = slackClient
 }
 
-func (p *SlackProvider) Resources(ctx context.Context) []func() resource.Resource {
+// Resources returns the list of resources supported by this provider.
+func (p *Provider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewConversationResource,
 		NewUsergroupResource,
 	}
 }
 
-func (p *SlackProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+// DataSources returns the list of data sources supported by this provider.
+func (p *Provider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewConversationDataSource,
 		NewUserDataSource,

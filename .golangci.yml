@@ -1,7 +1,5 @@
-version: "2"
-
 linters:
-  default: none
+  disable-all: true
   enable:
     - revive
     - mnd
@@ -10,8 +8,5 @@ linters:
     - goconst
     - whitespace
     - govet
-
-formatters:
-  enable:
     - goimports
     - gofmt

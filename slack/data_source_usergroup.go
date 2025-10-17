@@ -34,12 +34,12 @@ type UsergroupDataSourceModel struct {
 }
 
 // Metadata returns the data source type name.
-func (d *UsergroupDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (d *UsergroupDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_usergroup"
 }
 
 // Schema defines the schema for the data source.
-func (d *UsergroupDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *UsergroupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Fetches information about a Slack usergroup. Either `id` or `name` must be specified, but not both.",
 
@@ -81,7 +81,7 @@ func (d *UsergroupDataSource) Schema(ctx context.Context, req datasource.SchemaR
 }
 
 // Configure adds the provider configured client to the data source.
-func (d *UsergroupDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *UsergroupDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}

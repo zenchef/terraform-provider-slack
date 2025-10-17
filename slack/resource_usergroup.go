@@ -15,14 +15,17 @@ import (
 var _ resource.Resource = &UsergroupResource{}
 var _ resource.ResourceWithImportState = &UsergroupResource{}
 
+// NewUsergroupResource creates a new Slack usergroup resource.
 func NewUsergroupResource() resource.Resource {
 	return &UsergroupResource{}
 }
 
+// UsergroupResource implements the Slack usergroup resource.
 type UsergroupResource struct {
 	client *slack.Client
 }
 
+// UsergroupResourceModel describes the usergroup resource data model.
 type UsergroupResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
@@ -32,11 +35,11 @@ type UsergroupResourceModel struct {
 	Users       types.Set    `tfsdk:"users"`
 }
 
-func (r *UsergroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *UsergroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_usergroup"
 }
 
-func (r *UsergroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *UsergroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Slack usergroup",
 
@@ -73,7 +76,7 @@ func (r *UsergroupResource) Schema(ctx context.Context, req resource.SchemaReque
 	}
 }
 
-func (r *UsergroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *UsergroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -90,6 +93,7 @@ func (r *UsergroupResource) Configure(ctx context.Context, req resource.Configur
 	r.client = client
 }
 
+// Create creates a new Slack usergroup.
 func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data UsergroupResourceModel
 
@@ -172,6 +176,7 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Read reads the current state of a Slack usergroup.
 func (r *UsergroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data UsergroupResourceModel
 
@@ -214,6 +219,7 @@ func (r *UsergroupResource) Read(ctx context.Context, req resource.ReadRequest, 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Update updates a Slack usergroup.
 func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data, state UsergroupResourceModel
 
@@ -315,6 +321,7 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Delete disables a Slack usergroup.
 func (r *UsergroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data UsergroupResourceModel
 
@@ -330,6 +337,7 @@ func (r *UsergroupResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 }
 
+// ImportState imports a Slack usergroup using its ID.
 func (r *UsergroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
