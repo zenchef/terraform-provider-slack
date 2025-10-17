@@ -139,7 +139,7 @@ func testAccCheckSlackUserGroupDataSourceID(n string) resource.TestCheckFunc {
 const (
 	testAccCheckSlackUserGroupDataSourceConfigNonExistentID = `
 data slack_usergroup test {
- usergroup_id = "non-existent"
+ id = "non-existent"
 }
 `
 	testAccCheckSlackUserGroupDataSourceConfigNonExistentName = `
@@ -154,14 +154,14 @@ data slack_usergroup test {
 `
 	testAccCheckSlackUserGroupDataSourceConfigExistentIDAndName = `
 data slack_usergroup test {
-  usergroup_id = slack_usergroup.test.id
+  id = slack_usergroup.test.id
   name = slack_usergroup.test.name
 }
 `
 
 	testAccCheckSlackUserGroupDataSourceConfigExistentID = `
 data slack_usergroup test {
-  usergroup_id = slack_usergroup.test.id
+  id = slack_usergroup.test.id
 }
 `
 

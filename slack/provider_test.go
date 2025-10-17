@@ -68,16 +68,6 @@ func getTestSlackClient() *slack.Client {
 	return slack.New(token)
 }
 
-// Helper function to check if a slice contains a string
-func contains(s []string, e string) bool {
-	for _, x := range s {
-		if x == e {
-			return true
-		}
-	}
-	return false
-}
-
 // archiveConversationWithContext archives a conversation/channel
 func archiveConversationWithContext(ctx context.Context, client *slack.Client, channelID string) error {
 	err := client.ArchiveConversationContext(ctx, channelID)
