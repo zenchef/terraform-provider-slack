@@ -28,33 +28,80 @@ the documentation for the methods above.
 
 ## Example Usage
 
+### Basic usergroup
+
 ```hcl
-resource "slack_usergroup" "my_group" {
-  name        = "TestGroup"
-  handle      = "test"
-  description = "Test user group"
-  users       = ["USER00"]
-  channels    = ["CHANNEL00"]
+resource "slack_usergroup" "engineering" {
+  name        = "engineering"
+  handle      = "engineers"
+  description = "Engineering team"
 }
 ```
 
-Note that if a channel is removed from the `channels` list users are
-**not** removed from the channel. In order to keep the users in the
-groups and in the channel in sync set `permanent_users` in the channel:
+### Usergroup with users
 
 ```hcl
-resource "slack_usergroup" "my_group" {
-  name        = "TestGroup"
-  handle      = "test"
-  description = "Test user group"
-  users       = ["USER00"]
+data "slack_user" "engineer1" {
+  email = "engineer1@example.com"
 }
 
-resource "slack_conversation" "test" {
-  name              = "my-channel"
-  topic             = "The topic for my channel"
-  permanent_members = slack_usergroup.my_group.users
+data "slack_user" "engineer2" {
+  email = "engineer2@example.com"
+}
+
+resource "slack_usergroup" "engineering" {
+  name        = "engineering"
+  handle      = "engineers"
+  description = "Engineering team"
+  users       = [
+    data.slack_user.engineer1.id,
+    data.slack_user.engineer2.id
+  ]
+}
+```
+
+### Usergroup with default channels
+
+```hcl
+resource "slack_conversation" "engineering_channel" {
+  name       = "engineering"
+  topic      = "Engineering discussions"
+  is_private = true
+}
+
+resource "slack_usergroup" "engineering" {
+  name        = "engineering"
+  handle      = "engineers"
+  description = "Engineering team"
+  channels    = [slack_conversation.engineering_channel.id]
+}
+```
+
+### Integrated usergroup and channel with synchronized membership
+
+**Important**: When a channel is removed from the `channels` list, users are **not** automatically removed from the channel. To keep usergroup membership and channel membership synchronized, use `permanent_members` in the channel resource:
+
+```hcl
+resource "slack_usergroup" "devops" {
+  name        = "devops"
+  handle      = "devops"
+  description = "DevOps team"
+  users       = [
+    data.slack_user.devops1.id,
+    data.slack_user.devops2.id
+  ]
+}
+
+resource "slack_conversation" "devops_channel" {
+  name              = "devops-team"
+  topic             = "DevOps team channel"
   is_private        = true
+
+  # Keep channel membership synchronized with usergroup
+  permanent_members = slack_usergroup.devops.users
+
+  # Automatically kick users when removed from the usergroup
+  action_on_update_permanent_members = "kick"
 }
 ```
 
@@ -62,13 +109,16 @@ resource "slack_conversation" "test" {
 
 The following arguments are supported:
 
-- `name` - (Required) a name for the User Group. Must be unique among User Groups.
-- `description` - (Optional) a short description of the User Group.
-- `handle` - (Optional) a mention handle. Must be unique among channels, users
-  and User Groups.
-- `users` - (Optional) user IDs that represent the entire list of users for the
-  User Group.
-- `channels` - (Optional) channel IDs for which the User Group uses as a default.
+### Required Arguments
+
+- `name` - (Required) Name for the usergroup. Must be unique among all usergroups in the workspace.
+
+### Optional Arguments
+
+- `handle` - (Optional, Computed) Mention handle for the usergroup (e.g., `engineers` for `@engineers`). Must be unique among channels, users, and usergroups. If not specified, Slack will generate one based on the name.
+- `description` - (Optional, Computed) Short description of the usergroup. If not specified, defaults to empty string.
+- `users` - (Optional) Set of user IDs that represent the complete membership of the usergroup. When updated, this replaces the entire membership list.
+- `channels` - (Optional) Set of channel IDs where this usergroup should be set as a default. Members of the usergroup will see these channels as suggestions when they join Slack or when mentioned.
 
 ## Attribute Reference
 

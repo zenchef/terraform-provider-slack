@@ -50,32 +50,92 @@ the documentation for the methods above.
 
 ## Example Usage
 
+### Basic public channel
+
 ```hcl
-resource "slack_conversation" "test" {
-  name              = "my-channel"
-  topic             = "The topic for my channel"
-  permanent_members = []
-  is_private        = true
+resource "slack_conversation" "general" {
+  name       = "general-discussion"
+  topic      = "General team discussions"
+  purpose    = "A place for general team discussions"
+  is_private = false
 }
 ```
 
+### Private channel with permanent members
+
 ```hcl
-resource "slack_conversation" "nonadmin" {
-  name              = "my-channel01"
-  topic             = "The channel won't be archived on destroy"
-  permanent_members = []
+data "slack_user" "team_lead" {
+  email = "lead@example.com"
+}
+
+data "slack_user" "developer" {
+  email = "dev@example.com"
+}
+
+resource "slack_conversation" "private_project" {
+  name              = "project-alpha"
+  topic             = "Project Alpha discussions"
+  purpose           = "Private channel for Project Alpha team"
   is_private        = true
+  permanent_members = [
+    data.slack_user.team_lead.id,
+    data.slack_user.developer.id
+  ]
+
+  # Kick users when removed from permanent_members
+  action_on_update_permanent_members = "kick"
+}
+```
+
+### Channel integrated with usergroup
+
+```hcl
+resource "slack_usergroup" "devops" {
+  name        = "devops"
+  handle      = "devops"
+  description = "DevOps team"
+}
+
+resource "slack_conversation" "devops_channel" {
+  name              = "devops-team"
+  topic             = "DevOps team channel"
+  purpose           = "Channel for DevOps team communications"
+  is_private        = true
+  permanent_members = slack_usergroup.devops.users
+}
+```
+
+### Archived channel
+
+```hcl
+resource "slack_conversation" "old_project" {
+  name        = "old-project"
+  topic       = "Old project archive"
+  is_private  = false
+  is_archived = true
+}
+```
+
+### Channel that won't be archived on destroy
+
+```hcl
+resource "slack_conversation" "persistent" {
+  name              = "important-channel"
+  topic             = "This channel won't be archived on destroy"
+  is_private        = false
   action_on_destroy = "none"
 }
 ```
 
+### Adopting an existing channel
+
 ```hcl
 resource "slack_conversation" "adopted" {
-  name                               = "my-channel02"
-  topic                              = "Adopt existing, don't kick members"
-  permanent_members                  = []
+  name                               = "existing-channel"
+  topic                              = "Adopt existing channel, don't kick members"
   adopt_existing_channel             = true
   action_on_update_permanent_members = "none"
+  is_private                         = false
 }
 ```
 
@@ -83,26 +143,24 @@ resource "slack_conversation" "adopted" {
 
 The following arguments are supported:
 
-- `name` - (Required) name of the public or private channel.
-- `topic` - (Optional) topic for the channel.
-- `purpose` - (Optional) purpose of the channel.
-- `permanent_members` - (Optional) user IDs to add to the channel.
-- `is_private` - (Optional) create a private channel instead of a public one.
-- `is_archived` - (Optional) indicates a conversation is archived. Frozen in time.
-- `action_on_destroy` - (Optional, Default `archive`) indicates whether the
-conversation should be archived or left behind on destroy. Valid values are
-`archive | none`. Note that when set to `none` the conversation will be left
-as it is  and as a result any subsequent runs of terraform apply with the same
-name  will fail.
-- `action_on_update_permanent_members` - (Optional, Default `kick`) indicate
-whether the members should be kick of the channel when removed from
-`permanent_members`. When set to `none` the user are never kicked, this prevent
- a side effect on public channels where user that joined the channel are kicked.
-- `adopt_existing_channel` (Optional, Default `false`) indicates that an
-existing channel with the same name should be adopted by terraform and put under
-state management. If the existing channel is archived, it will be unarchived.
-(Note: for unarchiving of existing channels to work correctly, you_must_ use
-a user token, not a bot token, due to bugs in the Slack API)
+### Required Arguments
+
+- `name` - (Required) Name of the public or private channel. Channel names can only contain lowercase letters, numbers, hyphens, and underscores, and must be 80 characters or less.
+- `is_private` - (Required) Create a private channel instead of a public one. This cannot be changed after creation.
+
+### Optional Arguments
+
+- `topic` - (Optional) Topic for the channel (max 250 characters).
+- `purpose` - (Optional) Purpose of the channel (max 250 characters).
+- `permanent_members` - (Optional) Set of user IDs to manage as permanent members of the channel. The channel creator is automatically a member and does not need to be included in this list. When users are removed from this list, the behavior is controlled by `action_on_update_permanent_members`.
+- `is_archived` - (Optional, Default: `false`) Whether the conversation is archived. Archived channels are frozen in time - no messages can be posted and membership cannot be changed.
+- `action_on_destroy` - (Optional, Default: `archive`) Action to take when the resource is destroyed. Valid values:
+  - `archive` - Archive the channel on destroy (default behavior)
+  - `none` - Leave the channel as-is. **Warning**: Subsequent applies with the same name will fail
+- `action_on_update_permanent_members` - (Optional, Default: `kick`) Action to take when users are removed from `permanent_members`. Valid values:
+  - `kick` - Remove users from the channel when removed from `permanent_members` (default behavior)
+  - `none` - Do not remove users. Useful for public channels where users can self-join
+- `adopt_existing_channel` - (Optional, Default: `false`) Adopt an existing channel with the same name and bring it under Terraform management. If the existing channel is archived, it will be unarchived. **Note**: For unarchiving existing channels, you must use a user token, not a bot token, due to Slack API limitations.
 
 ## Attribute Reference
 

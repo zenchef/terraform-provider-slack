@@ -29,24 +29,32 @@ provider "slack" {
   token = var.slack_token
 }
 
-data "slack_user" "test_user_00" {
-  name = "contact_test-user-ter"
+# Lookup a user by email
+data "slack_user" "engineer" {
+  email = "engineer@example.com"
 }
 
 # Create a User Group
-resource "slack_usergroup" "my_group" {
-  name        = "TestGroup"
-  handle      = "test"
-  description = "Test user group"
-  users       = [data.slack_user.test_user_00.id]
+resource "slack_usergroup" "engineering" {
+  name        = "engineering"
+  handle      = "engineers"
+  description = "Engineering team"
+  users       = [data.slack_user.engineer.id]
 }
 
-# Create a Slack channel
-resource "slack_conversation" "test" {
-  name              = "my-channel"
-  topic             = "The topic for my channel"
-  permanent_members = slack_usergroup.my_group.users
+# Create a Slack channel with permanent members
+resource "slack_conversation" "engineering_channel" {
+  name              = "engineering"
+  topic             = "Engineering team discussions"
+  purpose           = "Channel for the engineering team"
+  permanent_members = slack_usergroup.engineering.users
   is_private        = true
+
+  # Archive the channel when destroyed (default)
+  action_on_destroy = "archive"
+
+  # Kick users when removed from permanent_members (default)
+  action_on_update_permanent_members = "kick"
 }
 ```
 

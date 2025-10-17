@@ -25,13 +25,40 @@ the documentation for the methods above.
 
 ## Example Usage
 
+### Lookup by channel ID
+
 ```hcl
-data "slack_conversation" "test" {
-  channel_id = "my-channel"
+data "slack_conversation" "by_id" {
+  channel_id = "C01234ABCDE"
 }
 
-data "slack_conversation" "test-name" {
-  name = "my-channel-name"
+output "channel_name" {
+  value = data.slack_conversation.by_id.name
+}
+```
+
+### Lookup public channel by name
+
+```hcl
+data "slack_conversation" "engineering" {
+  name = "engineering"
+}
+
+output "channel_topic" {
+  value = data.slack_conversation.engineering.topic
+}
+```
+
+### Lookup private channel by name
+
+```hcl
+data "slack_conversation" "private_channel" {
+  name       = "private-team"
+  is_private = true
+}
+
+output "channel_purpose" {
+  value = data.slack_conversation.private_channel.purpose
 }
 ```
 
@@ -50,17 +77,15 @@ with `name`.
 
 In addition to all arguments above, the following attributes are exported:
 
-- `name` - name of the public or private channel.
-- `topic` - topic for the channel.
-- `purpose` - purpose of the channel.
-- `creator` - is the user ID of the member that created this channel.
-- `created` - is a unix timestamp.
-- `is_private` - means the conversation is privileged between two or more members.
-- `is_archived` - indicates a conversation is archived. Frozen in time.
-- `is_shared` - means the conversation is in some way shared between multiple workspaces.
-- `is_ext_shared` - represents this conversation as being part of a Shared Channel
-with a remote organization.
-- `is_org_shared` - explains whether this shared channel is shared between Enterprise
-Grid workspaces within the same organization.
-- `is_general` - will be true if this channel is the "general" channel that includes
-all regular team members.
+- `id` - The ID of the channel (e.g., `C01234ABCDE`)
+- `name` - Name of the public or private channel
+- `topic` - Topic for the channel (max 250 characters)
+- `purpose` - Purpose of the channel (max 250 characters)
+- `creator` - User ID of the member that created this channel (e.g., `U01234ABCDE`)
+- `created` - Unix timestamp of when the channel was created
+- `is_private` - Whether the conversation is a private channel
+- `is_archived` - Whether the conversation is archived (frozen in time, no new messages allowed)
+- `is_shared` - Whether the conversation is in some way shared between multiple workspaces
+- `is_ext_shared` - Whether this conversation is part of a Shared Channel with a remote organization
+- `is_org_shared` - Whether this shared channel is shared between Enterprise Grid workspaces within the same organization
+- `is_general` - Whether this is the "general" channel that includes all regular team members in the workspace

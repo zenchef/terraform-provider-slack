@@ -48,4 +48,6 @@ The data source expects exactly one of these fields, you can't set both.
 
 In addition to all arguments above, the following attributes are exported:
 
-- `id` - The ID of the user
+- `id` - The ID of the user (e.g., `U01234ABCDE`)
+- `name` - The username of the user
+- `real_name` - The real name of the user
