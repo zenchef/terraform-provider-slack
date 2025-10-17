@@ -1,13 +1,17 @@
 version: "2"
 
 linters:
-  default:
-    - goimports
+  default: none
+  enable:
     - revive
     - mnd
-    - gofmt
     - dupl
     - misspell
     - goconst
     - whitespace
     - govet
+
+formatters:
+  enable:
+    - goimports
+    - gofmt
