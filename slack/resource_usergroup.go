@@ -250,20 +250,15 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 
 		// Build options with all current values
+		// Slack API requires name, handle, and description to always be provided
 		updateOptions := []slack.UpdateUserGroupsOption{
 			slack.UpdateUserGroupsOptionName(data.Name.ValueString()),
+			slack.UpdateUserGroupsOptionHandle(data.Handle.ValueString()),
 		}
 
-		// Only add handle if it's not null/empty
-		if !data.Handle.IsNull() && data.Handle.ValueString() != "" {
-			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionHandle(data.Handle.ValueString()))
-		}
-
-		// Only add description if it's not null/empty
-		if !data.Description.IsNull() && data.Description.ValueString() != "" {
-			description := data.Description.ValueString()
-			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionDescription(&description))
-		}
+		// Description is required and must be provided (can be empty string)
+		description := data.Description.ValueString()
+		updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionDescription(&description))
 
 		// Add channels only if not null
 		if !data.Channels.IsNull() {
