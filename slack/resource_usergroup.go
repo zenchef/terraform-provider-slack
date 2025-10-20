@@ -265,8 +265,10 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionDescription(&description))
 		}
 
-		// Add channels
-		updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionChannels(channels))
+		// Add channels only if not null
+		if !data.Channels.IsNull() {
+			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionChannels(channels))
+		}
 
 		_, err := r.client.UpdateUserGroupContext(ctx, data.ID.ValueString(), updateOptions...)
 		if err != nil {

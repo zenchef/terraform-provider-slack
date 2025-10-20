@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -94,10 +96,16 @@ func (r *ConversationResource) Schema(_ context.Context, _ resource.SchemaReques
 			"created": schema.Int64Attribute{
 				MarkdownDescription: "Timestamp when the conversation was created",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"creator": schema.StringAttribute{
 				MarkdownDescription: "User ID of the conversation creator",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_private": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is private",
@@ -112,18 +120,30 @@ func (r *ConversationResource) Schema(_ context.Context, _ resource.SchemaReques
 			"is_shared": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is shared",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_ext_shared": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is externally shared",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_org_shared": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is org shared",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_general": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is the general channel",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"action_on_destroy": schema.StringAttribute{
 				MarkdownDescription: "Action to take when destroying the conversation. Either 'none' or 'archive'. Default is 'archive'.",
@@ -216,6 +236,15 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 
+	// Archive the channel if requested (channels are always created unarchived)
+	if data.IsArchived.ValueBool() {
+		if err := r.client.ArchiveConversationContext(ctx, channel.ID); err != nil && err.Error() != errAlreadyArchived {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
+			return
+		}
+		data.IsArchived = types.BoolValue(true)
+	}
+
 	// Handle permanent members
 	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		var members []string
@@ -224,7 +253,11 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 
+		// Don't try to invite the creator - they're already in the channel
 		for _, userID := range members {
+			if userID == channel.Creator {
+				continue
+			}
 			if _, err := r.client.InviteUsersToConversationContext(ctx, channel.ID, userID); err != nil {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to invite user %s to conversation: %s", userID, err))
 				return
@@ -368,8 +401,21 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 
 		// Find users to add (in new but not in old)
+		// First get the creator to avoid inviting them
+		channelInfo, err := r.client.GetConversationInfoContext(ctx, &slack.GetConversationInfoInput{
+			ChannelID: id,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read conversation: %s", err))
+			return
+		}
+
 		for _, userID := range newMembers {
 			if !contains(oldMembers, userID) {
+				// Don't try to invite the creator
+				if userID == channelInfo.Creator {
+					continue
+				}
 				if _, err := r.client.InviteUsersToConversationContext(ctx, id, userID); err != nil {
 					resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to invite user %s to conversation: %s", userID, err))
 					return
@@ -383,6 +429,19 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 			for _, userID := range oldMembers {
 				if !contains(newMembers, userID) {
 					if err := r.client.KickUserFromConversationContext(ctx, id, userID); err != nil {
+						// Handle errors from Slack API
+						errStr := err.Error()
+						// Handle expected/ignorable errors
+						if errStr == "user_not_in_channel" || errStr == "cant_kick_self" || errStr == "cant_kick_from_general" {
+							continue
+						}
+						// Handle JSON unmarshal errors - these occur when Slack returns an error format
+						// that the Go SDK can't parse. We log a warning but continue.
+						if len(errStr) > 20 && errStr[:20] == "json: cannot unmarsh" {
+							resp.Diagnostics.AddWarning("Client Warning",
+								fmt.Sprintf("Received unparseable error when kicking user %s, continuing anyway. This user may still be in the channel.", userID))
+							continue
+						}
 						resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to kick user %s from conversation: %s", userID, err))
 						return
 					}
@@ -408,6 +467,10 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	data.IsShared = types.BoolValue(channel.IsShared)
 	data.IsExtShared = types.BoolValue(channel.IsExtShared)
 	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
+	data.IsPrivate = types.BoolValue(channel.IsPrivate)
+	data.IsGeneral = types.BoolValue(channel.IsGeneral)
+	data.Created = types.Int64Value(int64(channel.Created))
+	data.Creator = types.StringValue(channel.Creator)
 
 	// Get channel members if permanent_members is set
 	if !data.PermanentMembers.IsNull() {

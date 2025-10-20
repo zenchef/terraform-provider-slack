@@ -208,10 +208,17 @@ func testAccSlackUserGroup(name string) slack.UserGroup {
 
 func testAccSlackUserGroupWithUsers(name string, channels, users []string) slack.UserGroup {
 	sort.Strings(users)
+	// Slack handles can only contain lowercase letters, numbers, and underscores
+	// and must be 21 characters or less. Use the last 21 chars to maintain uniqueness.
+	handle := strings.ReplaceAll(name, "-", "_")
+	if len(handle) > 21 {
+		// Take the last 21 characters to keep the unique random suffix
+		handle = handle[len(handle)-21:]
+	}
 	group := slack.UserGroup{
 		Name:        name,
 		Description: fmt.Sprintf("Description for %s", name),
-		Handle:      fmt.Sprintf("handle-for-%s", name),
+		Handle:      handle,
 		Users:       users,
 		Prefs:       slack.UserGroupPrefs{Channels: channels},
 	}

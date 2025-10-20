@@ -19,24 +19,38 @@ type testUser struct {
 }
 
 var (
+	testUserCreator testUser
+	testUser00      testUser
+	testUser01      testUser
+)
+
+func init() {
+	// Load test users from environment variables
+	// Set these in your environment or CI:
+	// export SLACK_TEST_USER_CREATOR_ID="UXXXXXXXXX"  # Bot user ID (only ID needed)
+	// export SLACK_TEST_USER_00_ID="UXXXXXXXXX"
+	// export SLACK_TEST_USER_00_NAME="usernsame1"
+	// export SLACK_TEST_USER_00_EMAIL="user1@zenchef.com"
+	// export SLACK_TEST_USER_01_ID="UXXXXXXXXX"
+	// export SLACK_TEST_USER_01_NAME="username2"
+	// export SLACK_TEST_USER_01_EMAIL="user2@zenchef.com"
 	testUserCreator = testUser{
-		id:    "U01D6L97N0M",
-		name:  "contact",
-		email: "contact@pablovarela.co.uk",
+		id: os.Getenv("SLACK_TEST_USER_CREATOR_ID"),
+		// name and email not used in tests
 	}
 
 	testUser00 = testUser{
-		id:    "U01D31S1GUE",
-		name:  "contact_test-user-ter",
-		email: "contact+test-user-terraform-provider-slack-00@pablovarela.co.uk",
+		id:    os.Getenv("SLACK_TEST_USER_00_ID"),
+		name:  os.Getenv("SLACK_TEST_USER_00_NAME"),
+		email: os.Getenv("SLACK_TEST_USER_00_EMAIL"),
 	}
 
 	testUser01 = testUser{
-		id:    "U01DZK10L1W",
-		name:  "contact_test-user-206",
-		email: "contact+test-user-terraform-provider-slack-01@pablovarela.co.uk",
+		id:    os.Getenv("SLACK_TEST_USER_01_ID"),
+		name:  os.Getenv("SLACK_TEST_USER_01_NAME"),
+		email: os.Getenv("SLACK_TEST_USER_01_EMAIL"),
 	}
-)
+}
 
 // testAccProtoV6ProviderFactories are used to instantiate a provider during
 // acceptance testing. The factory function will be invoked for every Terraform
@@ -47,8 +61,21 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 }
 
 func testAccPreCheck(t *testing.T) {
-	if v := os.Getenv("SLACK_TOKEN"); v == "" {
-		t.Fatal("SLACK_TOKEN must be set for acceptance tests")
+	requiredEnvVars := []string{
+		"SLACK_TOKEN",
+		"SLACK_TEST_USER_CREATOR_ID",
+		"SLACK_TEST_USER_00_ID",
+		"SLACK_TEST_USER_00_NAME",
+		"SLACK_TEST_USER_00_EMAIL",
+		"SLACK_TEST_USER_01_ID",
+		"SLACK_TEST_USER_01_NAME",
+		"SLACK_TEST_USER_01_EMAIL",
+	}
+
+	for _, envVar := range requiredEnvVars {
+		if v := os.Getenv(envVar); v == "" {
+			t.Fatalf("%s must be set for acceptance tests", envVar)
+		}
 	}
 }
 
