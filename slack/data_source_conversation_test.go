@@ -2,6 +2,7 @@ package slack
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
@@ -12,6 +13,10 @@ import (
 )
 
 func TestAccSlackConversationDataSource_basic(t *testing.T) {
+	if os.Getenv("TF_ACC") != "1" {
+		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set to 1")
+		return
+	}
 	nameByID := acctest.RandomWithPrefix("test-acc-slack-conversation-test")
 	resourceNameByID := fmt.Sprintf("slack_conversation.%s", nameByID)
 	dataSourceNameByID := fmt.Sprintf("data.slack_conversation.%s", nameByID)

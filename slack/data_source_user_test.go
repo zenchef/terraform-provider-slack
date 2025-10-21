@@ -2,6 +2,7 @@ package slack
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
@@ -10,6 +11,10 @@ import (
 )
 
 func TestAccSlackUserDataSource_basic(t *testing.T) {
+	if os.Getenv("TF_ACC") != "1" {
+		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set to 1")
+		return
+	}
 	t.Parallel()
 	dataSourceName := "data.slack_user.test"
 

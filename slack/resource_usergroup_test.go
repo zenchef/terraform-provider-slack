@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,6 +56,10 @@ func init() {
 }
 
 func TestAccSlackUserGroupTest(t *testing.T) {
+	if os.Getenv("TF_ACC") != "1" {
+		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set to 1")
+		return
+	}
 	t.Parallel()
 
 	resourceName := "slack_usergroup.test"
