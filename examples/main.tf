@@ -17,6 +17,11 @@ data "slack_usergroup" "existing_group" {
   name = "existing-group"
 }
 
+# Lookup existing conversation by ID
+data "slack_conversation" "existing_channel" {
+  id = "C1234567890"
+}
+
 # ============================================================================
 # Usergroups - Manage Slack user groups
 # ============================================================================
@@ -105,11 +110,15 @@ resource "slack_conversation" "support_channel" {
 # Example: Complete workflow
 # ============================================================================
 
-# 1. Create a usergroup
+# 1. Create a usergroup with users and default channels
 resource "slack_usergroup" "devops" {
   name        = "devops"
   handle      = "devops"
   description = "DevOps team"
+  users       = [data.slack_user.by_name.id, data.slack_user.by_email.id]
+  channels    = [slack_conversation.devops_channel.id]
+
+  depends_on = [slack_conversation.devops_channel]
 }
 
 # 2. Create a channel for the team
@@ -118,15 +127,5 @@ resource "slack_conversation" "devops_channel" {
   topic             = "DevOps team channel"
   purpose           = "Channel for DevOps team communications"
   is_private        = true
-  permanent_members = slack_usergroup.devops.users
-}
-
-# 3. Assign the channel to the usergroup
-resource "slack_usergroup" "devops_with_channels" {
-  name        = slack_usergroup.devops.name
-  handle      = slack_usergroup.devops.handle
-  description = slack_usergroup.devops.description
-  channels    = [slack_conversation.devops_channel.id]
-
-  depends_on = [slack_conversation.devops_channel]
+  permanent_members = [data.slack_user.by_name.id, data.slack_user.by_email.id]
 }
