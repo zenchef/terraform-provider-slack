@@ -169,7 +169,7 @@ func testCheckSlackUserGroupAttributes(t *testing.T, resourceName string, expect
 		}
 
 		primary := rs.Primary
-		group, err := findUserGroupByID(context.Background(), primary.ID, false, getTestSlackClient())
+		group, err := findUserGroupByID(context.Background(), primary.ID, true, getTestSlackClient())
 		if err != nil {
 			return fmt.Errorf("couldn't get conversation info for %s: %s", primary.ID, err)
 		}

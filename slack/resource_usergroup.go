@@ -136,9 +136,12 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 			return
 		}
 		if len(users) > 0 {
-			_, err := r.client.UpdateUserGroupMembersContext(ctx, createdUserGroup.ID, strings.Join(users, ","))
+			usersStr := strings.Join(users, ",")
+			_, err := r.client.UpdateUserGroupMembersContext(ctx, createdUserGroup.ID, usersStr)
 			if err != nil {
-				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup members: %s", err))
+				resp.Diagnostics.AddError("Client Error",
+					fmt.Sprintf("Unable to update usergroup members: %s\nDebug info - Usergroup ID: %s, Users: %s",
+						err, createdUserGroup.ID, usersStr))
 				return
 			}
 		}
@@ -232,6 +235,9 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	// ID is computed, so we need to get it from state, not plan
+	data.ID = state.ID
+
 	// Check if any field has changed
 	needsUpdate := !data.Name.Equal(state.Name) ||
 		!data.Handle.Equal(state.Handle) ||
@@ -267,7 +273,14 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 
 		_, err := r.client.UpdateUserGroupContext(ctx, data.ID.ValueString(), updateOptions...)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup: %s", err))
+			// Log detailed information for debugging
+			channelsStr := "null"
+			if !data.Channels.IsNull() {
+				channelsStr = fmt.Sprintf("%v", channels)
+			}
+			resp.Diagnostics.AddError("Client Error",
+				fmt.Sprintf("Unable to update usergroup: %s\nDebug info - ID: %s, Name: %s, Handle: %s, Description: %s, Channels: %s",
+					err, data.ID.ValueString(), data.Name.ValueString(), data.Handle.ValueString(), data.Description.ValueString(), channelsStr))
 			return
 		}
 	}
@@ -279,9 +292,12 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		_, err := r.client.UpdateUserGroupMembersContext(ctx, data.ID.ValueString(), strings.Join(users, ","))
+		usersStr := strings.Join(users, ",")
+		_, err := r.client.UpdateUserGroupMembersContext(ctx, data.ID.ValueString(), usersStr)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup members: %s", err))
+			resp.Diagnostics.AddError("Client Error",
+				fmt.Sprintf("Unable to update usergroup members: %s\nDebug info - Usergroup ID: %s, Users: %s",
+					err, data.ID.ValueString(), usersStr))
 			return
 		}
 	}
