@@ -1,0 +1,44 @@
+name: Acceptance Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_pattern:
+        description: 'Test pattern to run (leave empty to run all)'
+        required: false
+        default: './...'
+        type: string
+
+jobs:
+  acceptance-tests:
+    name: Acceptance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.25
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+        id: go
+
+      - name: Run Acceptance Tests
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        run: |
+          if [ "${{ github.event.inputs.test_pattern }}" != "" ]; then
+            TF_ACC=1 go test -v -timeout 30m ${{ github.event.inputs.test_pattern }}
+          else
+            make testacc
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-test-results
+          path: |
+            *.log
+            test-*.json
+          retention-days: 7
