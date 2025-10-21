@@ -219,7 +219,10 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 	data.IsShared = types.BoolValue(channel.IsShared)
 	data.IsExtShared = types.BoolValue(channel.IsExtShared)
 	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
-	data.IsArchived = types.BoolValue(channel.IsArchived)
+	// Don't overwrite is_archived if it was specified in config - we'll set it after archiving
+	if data.IsArchived.IsNull() {
+		data.IsArchived = types.BoolValue(channel.IsArchived)
+	}
 
 	// Set optional fields if provided
 	if !data.Topic.IsNull() && data.Topic.ValueString() != "" {
@@ -236,16 +239,7 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 
-	// Archive the channel if requested (channels are always created unarchived)
-	if data.IsArchived.ValueBool() {
-		if err := r.client.ArchiveConversationContext(ctx, channel.ID); err != nil && err.Error() != errAlreadyArchived {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
-			return
-		}
-		data.IsArchived = types.BoolValue(true)
-	}
-
-	// Handle permanent members
+	// Handle permanent members BEFORE archiving (can't invite to archived channels)
 	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		var members []string
 		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &members, false)...)
@@ -263,6 +257,16 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 				return
 			}
 		}
+	}
+
+	// Archive the channel if requested (channels are always created unarchived)
+	// This must be done AFTER inviting members
+	if data.IsArchived.ValueBool() {
+		if err := r.client.ArchiveConversationContext(ctx, channel.ID); err != nil && err.Error() != errAlreadyArchived {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
+			return
+		}
+		data.IsArchived = types.BoolValue(true)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -302,8 +306,9 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 	data.Created = types.Int64Value(int64(channel.Created))
 	data.Creator = types.StringValue(channel.Creator)
 
-	// Get channel members if permanent_members is set in state
-	if !data.PermanentMembers.IsNull() {
+	// Only get channel members if permanent_members is explicitly set in state
+	// This prevents drift when permanent_members is not configured
+	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		members, _, err := r.client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
 			ChannelID: data.ID.ValueString(),
 		})
@@ -312,11 +317,17 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 			return
 		}
 
-		// Filter out the creator from the members list
+		// Get configured permanent members to filter the results
+		var configuredMembers []string
+		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &configuredMembers, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Only include members that are in the configured list
 		var permanentMembers []string
-		creator := channel.Creator
 		for _, member := range members {
-			if member != creator {
+			if contains(configuredMembers, member) {
 				permanentMembers = append(permanentMembers, member)
 			}
 		}
@@ -371,7 +382,9 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	// Update archived status if changed
+	archivedChanged := false
 	if !data.IsArchived.Equal(state.IsArchived) {
+		archivedChanged = true
 		if data.IsArchived.ValueBool() {
 			if err := r.client.ArchiveConversationContext(ctx, id); err != nil && err.Error() != errAlreadyArchived {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
@@ -463,7 +476,11 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	data.Name = types.StringValue(channel.Name)
 	data.Topic = types.StringValue(channel.Topic.Value)
 	data.Purpose = types.StringValue(channel.Purpose.Value)
-	data.IsArchived = types.BoolValue(channel.IsArchived)
+	// Only update is_archived from Slack if we didn't just change it
+	// This avoids race conditions where Slack hasn't updated yet
+	if !archivedChanged {
+		data.IsArchived = types.BoolValue(channel.IsArchived)
+	}
 	data.IsShared = types.BoolValue(channel.IsShared)
 	data.IsExtShared = types.BoolValue(channel.IsExtShared)
 	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
@@ -472,8 +489,9 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	data.Created = types.Int64Value(int64(channel.Created))
 	data.Creator = types.StringValue(channel.Creator)
 
-	// Get channel members if permanent_members is set
-	if !data.PermanentMembers.IsNull() {
+	// Only get channel members if permanent_members is explicitly set
+	// This prevents drift when permanent_members is not configured
+	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		members, _, err := r.client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
 			ChannelID: id,
 		})
@@ -482,11 +500,17 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 
-		// Filter out the creator from the members list
+		// Get configured permanent members to filter the results
+		var configuredMembers []string
+		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &configuredMembers, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Only include members that are in the configured list
 		var permanentMembers []string
-		creator := channel.Creator
 		for _, member := range members {
-			if member != creator {
+			if contains(configuredMembers, member) {
 				permanentMembers = append(permanentMembers, member)
 			}
 		}
