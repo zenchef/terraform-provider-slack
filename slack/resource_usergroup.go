@@ -15,14 +15,17 @@ import (
 var _ resource.Resource = &UsergroupResource{}
 var _ resource.ResourceWithImportState = &UsergroupResource{}
 
+// NewUsergroupResource creates a new Slack usergroup resource.
 func NewUsergroupResource() resource.Resource {
 	return &UsergroupResource{}
 }
 
+// UsergroupResource implements the Slack usergroup resource.
 type UsergroupResource struct {
 	client *slack.Client
 }
 
+// UsergroupResourceModel describes the usergroup resource data model.
 type UsergroupResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
@@ -32,11 +35,13 @@ type UsergroupResourceModel struct {
 	Users       types.Set    `tfsdk:"users"`
 }
 
-func (r *UsergroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+// Metadata returns the resource type name.
+func (r *UsergroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_usergroup"
 }
 
-func (r *UsergroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+// Schema defines the schema for the resource.
+func (r *UsergroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Slack usergroup",
 
@@ -73,7 +78,8 @@ func (r *UsergroupResource) Schema(ctx context.Context, req resource.SchemaReque
 	}
 }
 
-func (r *UsergroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+// Configure adds the provider configured client to the resource.
+func (r *UsergroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -90,6 +96,7 @@ func (r *UsergroupResource) Configure(ctx context.Context, req resource.Configur
 	r.client = client
 }
 
+// Create creates a new Slack usergroup.
 func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data UsergroupResourceModel
 
@@ -129,9 +136,12 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 			return
 		}
 		if len(users) > 0 {
-			_, err := r.client.UpdateUserGroupMembersContext(ctx, createdUserGroup.ID, strings.Join(users, ","))
+			usersStr := strings.Join(users, ",")
+			_, err := r.client.UpdateUserGroupMembersContext(ctx, createdUserGroup.ID, usersStr)
 			if err != nil {
-				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup members: %s", err))
+				resp.Diagnostics.AddError("Client Error",
+					fmt.Sprintf("Unable to update usergroup members: %s\nDebug info - Usergroup ID: %s, Users: %s",
+						err, createdUserGroup.ID, usersStr))
 				return
 			}
 		}
@@ -172,6 +182,7 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Read reads the current state of a Slack usergroup.
 func (r *UsergroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data UsergroupResourceModel
 
@@ -214,6 +225,7 @@ func (r *UsergroupResource) Read(ctx context.Context, req resource.ReadRequest, 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Update updates a Slack usergroup.
 func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data, state UsergroupResourceModel
 
@@ -222,6 +234,9 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// ID is computed, so we need to get it from state, not plan
+	data.ID = state.ID
 
 	// Check if any field has changed
 	needsUpdate := !data.Name.Equal(state.Name) ||
@@ -241,27 +256,31 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 
 		// Build options with all current values
+		// Slack API requires name, handle, and description to always be provided
 		updateOptions := []slack.UpdateUserGroupsOption{
 			slack.UpdateUserGroupsOptionName(data.Name.ValueString()),
+			slack.UpdateUserGroupsOptionHandle(data.Handle.ValueString()),
 		}
 
-		// Only add handle if it's not null/empty
-		if !data.Handle.IsNull() && data.Handle.ValueString() != "" {
-			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionHandle(data.Handle.ValueString()))
-		}
+		// Description is required and must be provided (can be empty string)
+		description := data.Description.ValueString()
+		updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionDescription(&description))
 
-		// Only add description if it's not null/empty
-		if !data.Description.IsNull() && data.Description.ValueString() != "" {
-			description := data.Description.ValueString()
-			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionDescription(&description))
+		// Add channels only if not null
+		if !data.Channels.IsNull() {
+			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionChannels(channels))
 		}
-
-		// Add channels
-		updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionChannels(channels))
 
 		_, err := r.client.UpdateUserGroupContext(ctx, data.ID.ValueString(), updateOptions...)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup: %s", err))
+			// Log detailed information for debugging
+			channelsStr := "null"
+			if !data.Channels.IsNull() {
+				channelsStr = fmt.Sprintf("%v", channels)
+			}
+			resp.Diagnostics.AddError("Client Error",
+				fmt.Sprintf("Unable to update usergroup: %s\nDebug info - ID: %s, Name: %s, Handle: %s, Description: %s, Channels: %s",
+					err, data.ID.ValueString(), data.Name.ValueString(), data.Handle.ValueString(), data.Description.ValueString(), channelsStr))
 			return
 		}
 	}
@@ -273,9 +292,12 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		_, err := r.client.UpdateUserGroupMembersContext(ctx, data.ID.ValueString(), strings.Join(users, ","))
+		usersStr := strings.Join(users, ",")
+		_, err := r.client.UpdateUserGroupMembersContext(ctx, data.ID.ValueString(), usersStr)
 		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update usergroup members: %s", err))
+			resp.Diagnostics.AddError("Client Error",
+				fmt.Sprintf("Unable to update usergroup members: %s\nDebug info - Usergroup ID: %s, Users: %s",
+					err, data.ID.ValueString(), usersStr))
 			return
 		}
 	}
@@ -315,6 +337,7 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Delete disables a Slack usergroup.
 func (r *UsergroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data UsergroupResourceModel
 
@@ -330,6 +353,7 @@ func (r *UsergroupResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 }
 
+// ImportState imports a Slack usergroup using its ID.
 func (r *UsergroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

@@ -7,13 +7,24 @@ output "user_by_name" {
   value = {
     id    = data.slack_user.by_name.id
     name  = data.slack_user.by_name.name
-    email = data.slack_user.by_name.real_name
+    email = data.slack_user.by_name.email
   }
 }
 
 output "existing_usergroup" {
   description = "Existing usergroup information"
   value       = data.slack_usergroup.existing_group
+}
+
+output "existing_channel" {
+  description = "Existing channel information"
+  value = {
+    id         = data.slack_conversation.existing_channel.id
+    name       = data.slack_conversation.existing_channel.name
+    topic      = data.slack_conversation.existing_channel.topic
+    purpose    = data.slack_conversation.existing_channel.purpose
+    is_private = data.slack_conversation.existing_channel.is_private
+  }
 }
 
 # ============================================================================

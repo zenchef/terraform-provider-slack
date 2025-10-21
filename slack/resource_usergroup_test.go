@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,6 +56,10 @@ func init() {
 }
 
 func TestAccSlackUserGroupTest(t *testing.T) {
+	if os.Getenv("TF_ACC") != "1" {
+		t.Skip("Acceptance tests skipped unless env 'TF_ACC' is set to 1")
+		return
+	}
 	t.Parallel()
 
 	resourceName := "slack_usergroup.test"
@@ -143,10 +148,10 @@ func testSlackUserGroupUpdate(t *testing.T, resourceName string, createChannel s
 		PreCheck: func() {
 			testAccPreCheck(t)
 		},
-		IDRefreshName:     resourceName,
+		IDRefreshName:            resourceName,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		CheckDestroy:      testAccCheckUserGroupDestroy,
-		Steps:             steps,
+		CheckDestroy:             testAccCheckUserGroupDestroy,
+		Steps:                    steps,
 	})
 }
 
@@ -169,7 +174,7 @@ func testCheckSlackUserGroupAttributes(t *testing.T, resourceName string, expect
 		}
 
 		primary := rs.Primary
-		group, err := findUserGroupByID(context.Background(), primary.ID, false, getTestSlackClient())
+		group, err := findUserGroupByID(context.Background(), primary.ID, true, getTestSlackClient())
 		if err != nil {
 			return fmt.Errorf("couldn't get conversation info for %s: %s", primary.ID, err)
 		}
@@ -208,10 +213,17 @@ func testAccSlackUserGroup(name string) slack.UserGroup {
 
 func testAccSlackUserGroupWithUsers(name string, channels, users []string) slack.UserGroup {
 	sort.Strings(users)
+	// Slack handles can only contain lowercase letters, numbers, and underscores
+	// and must be 21 characters or less. Use the last 21 chars to maintain uniqueness.
+	handle := strings.ReplaceAll(name, "-", "_")
+	if len(handle) > 21 {
+		// Take the last 21 characters to keep the unique random suffix
+		handle = handle[len(handle)-21:]
+	}
 	group := slack.UserGroup{
 		Name:        name,
 		Description: fmt.Sprintf("Description for %s", name),
-		Handle:      fmt.Sprintf("handle-for-%s", name),
+		Handle:      handle,
 		Users:       users,
 		Prefs:       slack.UserGroupPrefs{Channels: channels},
 	}

@@ -8,6 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -15,10 +17,16 @@ import (
 	"github.com/slack-go/slack"
 )
 
+const (
+	errChannelNotFound = "channel_not_found"
+	errAlreadyArchived = "already_archived"
+)
+
 // Ensure provider defined types fully satisfy framework interfaces
 var _ resource.Resource = &ConversationResource{}
 var _ resource.ResourceWithImportState = &ConversationResource{}
 
+// NewConversationResource creates a new Slack conversation resource.
 func NewConversationResource() resource.Resource {
 	return &ConversationResource{}
 }
@@ -30,29 +38,31 @@ type ConversationResource struct {
 
 // ConversationResourceModel describes the resource data model
 type ConversationResourceModel struct {
-	ID                                  types.String `tfsdk:"id"`
-	Name                                types.String `tfsdk:"name"`
-	Topic                               types.String `tfsdk:"topic"`
-	Purpose                             types.String `tfsdk:"purpose"`
-	PermanentMembers                    types.Set    `tfsdk:"permanent_members"`
-	Created                             types.Int64  `tfsdk:"created"`
-	Creator                             types.String `tfsdk:"creator"`
-	IsPrivate                           types.Bool   `tfsdk:"is_private"`
-	IsArchived                          types.Bool   `tfsdk:"is_archived"`
-	IsShared                            types.Bool   `tfsdk:"is_shared"`
-	IsExtShared                         types.Bool   `tfsdk:"is_ext_shared"`
-	IsOrgShared                         types.Bool   `tfsdk:"is_org_shared"`
-	IsGeneral                           types.Bool   `tfsdk:"is_general"`
-	ActionOnDestroy                     types.String `tfsdk:"action_on_destroy"`
-	ActionOnUpdatePermanentMembers      types.String `tfsdk:"action_on_update_permanent_members"`
-	AdoptExistingChannel                types.Bool   `tfsdk:"adopt_existing_channel"`
+	ID                             types.String `tfsdk:"id"`
+	Name                           types.String `tfsdk:"name"`
+	Topic                          types.String `tfsdk:"topic"`
+	Purpose                        types.String `tfsdk:"purpose"`
+	PermanentMembers               types.Set    `tfsdk:"permanent_members"`
+	Created                        types.Int64  `tfsdk:"created"`
+	Creator                        types.String `tfsdk:"creator"`
+	IsPrivate                      types.Bool   `tfsdk:"is_private"`
+	IsArchived                     types.Bool   `tfsdk:"is_archived"`
+	IsShared                       types.Bool   `tfsdk:"is_shared"`
+	IsExtShared                    types.Bool   `tfsdk:"is_ext_shared"`
+	IsOrgShared                    types.Bool   `tfsdk:"is_org_shared"`
+	IsGeneral                      types.Bool   `tfsdk:"is_general"`
+	ActionOnDestroy                types.String `tfsdk:"action_on_destroy"`
+	ActionOnUpdatePermanentMembers types.String `tfsdk:"action_on_update_permanent_members"`
+	AdoptExistingChannel           types.Bool   `tfsdk:"adopt_existing_channel"`
 }
 
-func (r *ConversationResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+// Metadata returns the resource type name.
+func (r *ConversationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_conversation"
 }
 
-func (r *ConversationResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+// Schema defines the schema for the resource.
+func (r *ConversationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Slack conversation (channel)",
 
@@ -86,10 +96,16 @@ func (r *ConversationResource) Schema(ctx context.Context, req resource.SchemaRe
 			"created": schema.Int64Attribute{
 				MarkdownDescription: "Timestamp when the conversation was created",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"creator": schema.StringAttribute{
 				MarkdownDescription: "User ID of the conversation creator",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_private": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is private",
@@ -104,18 +120,30 @@ func (r *ConversationResource) Schema(ctx context.Context, req resource.SchemaRe
 			"is_shared": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is shared",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_ext_shared": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is externally shared",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_org_shared": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is org shared",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"is_general": schema.BoolAttribute{
 				MarkdownDescription: "Whether the conversation is the general channel",
 				Computed:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"action_on_destroy": schema.StringAttribute{
 				MarkdownDescription: "Action to take when destroying the conversation. Either 'none' or 'archive'. Default is 'archive'.",
@@ -139,7 +167,8 @@ func (r *ConversationResource) Schema(ctx context.Context, req resource.SchemaRe
 	}
 }
 
-func (r *ConversationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+// Configure adds the provider configured client to the resource.
+func (r *ConversationResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -157,6 +186,7 @@ func (r *ConversationResource) Configure(ctx context.Context, req resource.Confi
 	r.client = client
 }
 
+// Create creates a new Slack conversation resource.
 func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data ConversationResourceModel
 
@@ -189,7 +219,10 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 	data.IsShared = types.BoolValue(channel.IsShared)
 	data.IsExtShared = types.BoolValue(channel.IsExtShared)
 	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
-	data.IsArchived = types.BoolValue(channel.IsArchived)
+	// Don't overwrite is_archived if it was specified in config - we'll set it after archiving
+	if data.IsArchived.IsNull() {
+		data.IsArchived = types.BoolValue(channel.IsArchived)
+	}
 
 	// Set optional fields if provided
 	if !data.Topic.IsNull() && data.Topic.ValueString() != "" {
@@ -206,7 +239,7 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 
-	// Handle permanent members
+	// Handle permanent members BEFORE archiving (can't invite to archived channels)
 	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		var members []string
 		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &members, false)...)
@@ -214,12 +247,26 @@ func (r *ConversationResource) Create(ctx context.Context, req resource.CreateRe
 			return
 		}
 
+		// Don't try to invite the creator - they're already in the channel
 		for _, userID := range members {
+			if userID == channel.Creator {
+				continue
+			}
 			if _, err := r.client.InviteUsersToConversationContext(ctx, channel.ID, userID); err != nil {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to invite user %s to conversation: %s", userID, err))
 				return
 			}
 		}
+	}
+
+	// Archive the channel if requested (channels are always created unarchived)
+	// This must be done AFTER inviting members
+	if data.IsArchived.ValueBool() {
+		if err := r.client.ArchiveConversationContext(ctx, channel.ID); err != nil && err.Error() != errAlreadyArchived {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
+			return
+		}
+		data.IsArchived = types.BoolValue(true)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -238,7 +285,7 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 		ChannelID: data.ID.ValueString(),
 	})
 	if err != nil {
-		if err.Error() == "channel_not_found" {
+		if err.Error() == errChannelNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -259,8 +306,9 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 	data.Created = types.Int64Value(int64(channel.Created))
 	data.Creator = types.StringValue(channel.Creator)
 
-	// Get channel members if permanent_members is set in state
-	if !data.PermanentMembers.IsNull() {
+	// Only get channel members if permanent_members is explicitly set in state
+	// This prevents drift when permanent_members is not configured
+	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		members, _, err := r.client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
 			ChannelID: data.ID.ValueString(),
 		})
@@ -269,11 +317,17 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 			return
 		}
 
-		// Filter out the creator from the members list
+		// Get configured permanent members to filter the results
+		var configuredMembers []string
+		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &configuredMembers, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Only include members that are in the configured list
 		var permanentMembers []string
-		creator := channel.Creator
 		for _, member := range members {
-			if member != creator {
+			if contains(configuredMembers, member) {
 				permanentMembers = append(permanentMembers, member)
 			}
 		}
@@ -289,6 +343,7 @@ func (r *ConversationResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Update updates an existing Slack conversation resource.
 func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data ConversationResourceModel
 
@@ -327,9 +382,11 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	// Update archived status if changed
+	archivedChanged := false
 	if !data.IsArchived.Equal(state.IsArchived) {
+		archivedChanged = true
 		if data.IsArchived.ValueBool() {
-			if err := r.client.ArchiveConversationContext(ctx, id); err != nil && err.Error() != "already_archived" {
+			if err := r.client.ArchiveConversationContext(ctx, id); err != nil && err.Error() != errAlreadyArchived {
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
 				return
 			}
@@ -357,8 +414,21 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 
 		// Find users to add (in new but not in old)
+		// First get the creator to avoid inviting them
+		channelInfo, err := r.client.GetConversationInfoContext(ctx, &slack.GetConversationInfoInput{
+			ChannelID: id,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read conversation: %s", err))
+			return
+		}
+
 		for _, userID := range newMembers {
 			if !contains(oldMembers, userID) {
+				// Don't try to invite the creator
+				if userID == channelInfo.Creator {
+					continue
+				}
 				if _, err := r.client.InviteUsersToConversationContext(ctx, id, userID); err != nil {
 					resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to invite user %s to conversation: %s", userID, err))
 					return
@@ -372,6 +442,19 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 			for _, userID := range oldMembers {
 				if !contains(newMembers, userID) {
 					if err := r.client.KickUserFromConversationContext(ctx, id, userID); err != nil {
+						// Handle errors from Slack API
+						errStr := err.Error()
+						// Handle expected/ignorable errors
+						if errStr == "user_not_in_channel" || errStr == "cant_kick_self" || errStr == "cant_kick_from_general" {
+							continue
+						}
+						// Handle JSON unmarshal errors - these occur when Slack returns an error format
+						// that the Go SDK can't parse. We log a warning but continue.
+						if len(errStr) > 20 && errStr[:20] == "json: cannot unmarsh" {
+							resp.Diagnostics.AddWarning("Client Warning",
+								fmt.Sprintf("Received unparseable error when kicking user %s, continuing anyway. This user may still be in the channel.", userID))
+							continue
+						}
 						resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to kick user %s from conversation: %s", userID, err))
 						return
 					}
@@ -393,13 +476,22 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	data.Name = types.StringValue(channel.Name)
 	data.Topic = types.StringValue(channel.Topic.Value)
 	data.Purpose = types.StringValue(channel.Purpose.Value)
-	data.IsArchived = types.BoolValue(channel.IsArchived)
+	// Only update is_archived from Slack if we didn't just change it
+	// This avoids race conditions where Slack hasn't updated yet
+	if !archivedChanged {
+		data.IsArchived = types.BoolValue(channel.IsArchived)
+	}
 	data.IsShared = types.BoolValue(channel.IsShared)
 	data.IsExtShared = types.BoolValue(channel.IsExtShared)
 	data.IsOrgShared = types.BoolValue(channel.IsOrgShared)
+	data.IsPrivate = types.BoolValue(channel.IsPrivate)
+	data.IsGeneral = types.BoolValue(channel.IsGeneral)
+	data.Created = types.Int64Value(int64(channel.Created))
+	data.Creator = types.StringValue(channel.Creator)
 
-	// Get channel members if permanent_members is set
-	if !data.PermanentMembers.IsNull() {
+	// Only get channel members if permanent_members is explicitly set
+	// This prevents drift when permanent_members is not configured
+	if !data.PermanentMembers.IsNull() && len(data.PermanentMembers.Elements()) > 0 {
 		members, _, err := r.client.GetUsersInConversationContext(ctx, &slack.GetUsersInConversationParameters{
 			ChannelID: id,
 		})
@@ -408,11 +500,17 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 			return
 		}
 
-		// Filter out the creator from the members list
+		// Get configured permanent members to filter the results
+		var configuredMembers []string
+		resp.Diagnostics.Append(data.PermanentMembers.ElementsAs(ctx, &configuredMembers, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Only include members that are in the configured list
 		var permanentMembers []string
-		creator := channel.Creator
 		for _, member := range members {
-			if member != creator {
+			if contains(configuredMembers, member) {
 				permanentMembers = append(permanentMembers, member)
 			}
 		}
@@ -428,6 +526,7 @@ func (r *ConversationResource) Update(ctx context.Context, req resource.UpdateRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Delete removes a Slack conversation resource.
 func (r *ConversationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data ConversationResourceModel
 
@@ -439,13 +538,14 @@ func (r *ConversationResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	action := data.ActionOnDestroy.ValueString()
 	if action == "archive" {
-		if err := r.client.ArchiveConversationContext(ctx, data.ID.ValueString()); err != nil && err.Error() != "already_archived" && err.Error() != "channel_not_found" {
+		if err := r.client.ArchiveConversationContext(ctx, data.ID.ValueString()); err != nil && err.Error() != errAlreadyArchived && err.Error() != errChannelNotFound {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to archive conversation: %s", err))
 			return
 		}
 	}
 }
 
+// ImportState imports an existing Slack conversation resource.
 func (r *ConversationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

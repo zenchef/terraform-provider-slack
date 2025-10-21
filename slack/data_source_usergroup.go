@@ -12,14 +12,17 @@ import (
 
 var _ datasource.DataSource = &UsergroupDataSource{}
 
+// NewUsergroupDataSource creates a new Slack usergroup data source.
 func NewUsergroupDataSource() datasource.DataSource {
 	return &UsergroupDataSource{}
 }
 
+// UsergroupDataSource implements the Slack usergroup data source.
 type UsergroupDataSource struct {
 	client *slack.Client
 }
 
+// UsergroupDataSourceModel describes the data source data model.
 type UsergroupDataSourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	UsergroupID types.String `tfsdk:"usergroup_id"`
@@ -30,11 +33,13 @@ type UsergroupDataSourceModel struct {
 	Channels    types.Set    `tfsdk:"channels"`
 }
 
-func (d *UsergroupDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+// Metadata returns the data source type name.
+func (d *UsergroupDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_usergroup"
 }
 
-func (d *UsergroupDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+// Schema defines the schema for the data source.
+func (d *UsergroupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Fetches information about a Slack usergroup. Either `id` or `name` must be specified, but not both.",
 
@@ -75,7 +80,8 @@ func (d *UsergroupDataSource) Schema(ctx context.Context, req datasource.SchemaR
 	}
 }
 
-func (d *UsergroupDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+// Configure adds the provider configured client to the data source.
+func (d *UsergroupDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}

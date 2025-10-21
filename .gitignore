@@ -208,3 +208,6 @@ terraform-provider-slack_*
 /examples/terraform.tfstate
 /examples/terraform.tfstate.backup
 /examples/.terraform/
+
+# Local environment variables
+.env

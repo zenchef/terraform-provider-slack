@@ -1,3 +1,4 @@
+// Package main provides the entry point for the Terraform provider for Slack.
 package main
 
 import (
@@ -6,7 +7,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/pablovarela/terraform-provider-slack/slack"
+	"github.com/zenchef/terraform-provider-slack/slack"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry/website
@@ -22,7 +23,7 @@ import (
 var (
 	// these will be set by the goreleaser configuration
 	// to appropriate values for the compiled binary.
-	version string = "dev"
+	version = "dev"
 
 	// goreleaser can pass other information to the main package, such as the specific commit
 	// https://goreleaser.com/cookbooks/using-main.version/
@@ -35,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/pablovarela/slack",
+		Address: "registry.terraform.io/zenchef/slack",
 		Debug:   debug,
 	}
 
