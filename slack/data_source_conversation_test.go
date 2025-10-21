@@ -36,36 +36,26 @@ func TestAccSlackConversationDataSource_basic(t *testing.T) {
 				Config: testAccCheckSlackConversationDataSourceConfig(createChannelByID),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckSlackConversationDataSourceID(dataSourceNameByID),
-					resource.TestCheckResourceAttrPair(dataSourceNameByID, "channel_id", resourceNameByID, "id"),
+					resource.TestCheckResourceAttrPair(dataSourceNameByID, "id", resourceNameByID, "id"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByID, "name", resourceNameByID, "name"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByID, "topic", resourceNameByID, "topic"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByID, "purpose", resourceNameByID, "purpose"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByID, "creator", resourceNameByID, "creator"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByID, "created", resourceNameByID, "created"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByID, "is_private", resourceNameByID, "is_private"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByID, "is_archived", resourceNameByID, "is_archived"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByID, "is_shared", resourceNameByID, "is_shared"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByID, "is_ext_shared", resourceNameByID, "is_ext_shared"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByID, "is_org_shared", resourceNameByID, "is_org_shared"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByID, "is_general", resourceNameByID, "is_general"),
 				),
 			},
 			{
-				Config: testAccCheckSlackConversationDataSourceConfigName(createChannelByName),
+				Config: testAccCheckSlackConversationDataSourceConfig(createChannelByName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckSlackConversationDataSourceID(dataSourceNameByName),
-					resource.TestCheckResourceAttrPair(dataSourceNameByName, "channel_id", resourceNameByName, "id"),
+					resource.TestCheckResourceAttrPair(dataSourceNameByName, "id", resourceNameByName, "id"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByName, "name", resourceNameByName, "name"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByName, "topic", resourceNameByName, "topic"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByName, "purpose", resourceNameByName, "purpose"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByName, "creator", resourceNameByName, "creator"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByName, "created", resourceNameByName, "created"),
 					resource.TestCheckResourceAttrPair(dataSourceNameByName, "is_private", resourceNameByName, "is_private"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByName, "is_archived", resourceNameByName, "is_archived"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByName, "is_shared", resourceNameByName, "is_shared"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByName, "is_ext_shared", resourceNameByName, "is_ext_shared"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByName, "is_org_shared", resourceNameByName, "is_org_shared"),
-					resource.TestCheckResourceAttrPair(dataSourceNameByName, "is_general", resourceNameByName, "is_general"),
 				),
 			},
 		},
@@ -89,12 +79,12 @@ func testAccCheckSlackConversationDataSourceID(n string) resource.TestCheckFunc 
 const (
 	testAccCheckSlackConversationDataSourceConfigNonExistent = `
 data slack_conversation test {
- channel_id = "non-existent"
+ id = "non-existent"
 }
 `
 	testAccCheckSlackConversationDataSourceConfigExistent = `
 data slack_conversation %s {
-  channel_id = slack_conversation.%s.id
+  id = slack_conversation.%s.id
 }
 `
 	testAccCheckSlackConversationDataSourceConfigNameExistent = `

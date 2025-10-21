@@ -20,7 +20,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserDataSourceConfigNonExistentByName,
-					ExpectError: regexp.MustCompile(`your query returned no results`),
+					ExpectError: regexp.MustCompile(`no results found for name`),
 				},
 			},
 		})
@@ -46,7 +46,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 			Steps: []resource.TestStep{
 				{
 					Config:      testAccCheckSlackUserDataSourceConfigMissingFields,
-					ExpectError: regexp.MustCompile(`Invalid combination of arguments`),
+					ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
 				},
 			},
 		})
@@ -58,8 +58,8 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
-					Config:      testAccCheckSlackUserDataSourceConfigExistentByNameAndEmail,
-					ExpectError: regexp.MustCompile(`Invalid combination of arguments`),
+					Config:      testAccCheckSlackUserDataSourceConfigExistentByNameAndEmail(),
+					ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
 				},
 			},
 		})
@@ -71,7 +71,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
-					Config: testAccCheckSlackUserDataSourceConfigExistentByName,
+					Config: testAccCheckSlackUserDataSourceConfigExistentByName(),
 					Check: resource.ComposeTestCheckFunc(
 						testAccCheckSlackUserDataSourceID(dataSourceName),
 						resource.TestCheckResourceAttr(dataSourceName, "name", testUser00.name),
@@ -89,7 +89,7 @@ func TestAccSlackUserDataSource_basic(t *testing.T) {
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{
 				{
-					Config: testAccCheckSlackUserDataSourceConfigExistentByEmail,
+					Config: testAccCheckSlackUserDataSourceConfigExistentByEmail(),
 					Check: resource.ComposeTestCheckFunc(
 						testAccCheckSlackUserDataSourceID(dataSourceName),
 						resource.TestCheckResourceAttr(dataSourceName, "name", testUser00.name),
@@ -135,23 +135,27 @@ data slack_user test {
 `
 )
 
-var (
-	testAccCheckSlackUserDataSourceConfigExistentByName = fmt.Sprintf(`
+func testAccCheckSlackUserDataSourceConfigExistentByName() string {
+	return fmt.Sprintf(`
 data slack_user test {
  name = "%s"
 }
 `, testUser00.name)
+}
 
-	testAccCheckSlackUserDataSourceConfigExistentByEmail = fmt.Sprintf(`
+func testAccCheckSlackUserDataSourceConfigExistentByEmail() string {
+	return fmt.Sprintf(`
 data slack_user test {
  email = "%s"
 }
 `, testUser00.email)
+}
 
-	testAccCheckSlackUserDataSourceConfigExistentByNameAndEmail = fmt.Sprintf(`
+func testAccCheckSlackUserDataSourceConfigExistentByNameAndEmail() string {
+	return fmt.Sprintf(`
 data slack_user test {
  name = "%s"
  email = "%s"
 }
 `, testUser00.name, testUser00.email)
-)
+}
