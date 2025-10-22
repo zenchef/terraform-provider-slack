@@ -95,6 +95,14 @@ func TestAccSlackUserGroupTest(t *testing.T) {
 
 		testSlackUserGroupUpdate(t, resourceName, createUserGroup, &updateUserGroup)
 	})
+
+	t.Run("create without channels attribute", func(t *testing.T) {
+		name := acctest.RandomWithPrefix(userGroupResourceNamePrefix)
+
+		// Test creating a usergroup without specifying channels
+		// This ensures no "inconsistent result" error when channels is null
+		testSlackUserGroupWithoutChannels(t, resourceName, name)
+	})
 }
 
 func createTestConversation(t *testing.T) *slack.Channel {
@@ -264,4 +272,54 @@ resource slack_usergroup test {
   channels    =  [%s]
 }
 `, c.Name, c.Description, c.Handle, strings.Join(users, ","), strings.Join(channels, ","))
+}
+
+// testSlackUserGroupWithoutChannels tests creating a usergroup without specifying channels attribute
+// This ensures the provider doesn't produce "inconsistent result" errors when channels is null
+func testSlackUserGroupWithoutChannels(t *testing.T, resourceName string, name string) {
+	sort.Strings([]string{testUser00.id})
+	handle := strings.ReplaceAll(name, "-", "_")
+	if len(handle) > 21 {
+		handle = handle[len(handle)-21:]
+	}
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheck(t)
+		},
+		IDRefreshName:            resourceName,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckUserGroupDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSlackUserGroupConfigWithoutChannels(name, handle, testUser00.id),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", name),
+					resource.TestCheckResourceAttr(resourceName, "description", fmt.Sprintf("Description for %s", name)),
+					resource.TestCheckResourceAttr(resourceName, "handle", handle),
+					// Verify channels is computed as empty set when not specified
+					resource.TestCheckResourceAttr(resourceName, "channels.#", "0"),
+					// Verify users is set correctly
+					resource.TestCheckResourceAttr(resourceName, "users.#", "1"),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+// testAccSlackUserGroupConfigWithoutChannels creates a config without channels attribute
+func testAccSlackUserGroupConfigWithoutChannels(name, handle, userID string) string {
+	return fmt.Sprintf(`
+resource slack_usergroup test {
+  name        = "%s"
+  description = "Description for %s"
+  handle      = "%s"
+  users       = ["%s"]
+}
+`, name, name, handle, userID)
 }
