@@ -68,11 +68,13 @@ func (r *UsergroupResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Channel IDs that the usergroup should be associated with",
 				ElementType:         types.StringType,
 				Optional:            true,
+				Computed:            true,
 			},
 			"users": schema.SetAttribute{
 				MarkdownDescription: "User IDs that are members of the usergroup",
 				ElementType:         types.StringType,
 				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -107,7 +109,7 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Get channel IDs
 	var channels []string
-	if !data.Channels.IsNull() {
+	if !data.Channels.IsNull() && !data.Channels.IsUnknown() {
 		resp.Diagnostics.Append(data.Channels.ElementsAs(ctx, &channels, false)...)
 	}
 
@@ -129,7 +131,7 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 	data.ID = types.StringValue(createdUserGroup.ID)
 
 	// Update members if specified
-	if !data.Users.IsNull() {
+	if !data.Users.IsNull() && !data.Users.IsUnknown() {
 		var users []string
 		resp.Diagnostics.Append(data.Users.ElementsAs(ctx, &users, false)...)
 		if resp.Diagnostics.HasError() {
@@ -161,13 +163,19 @@ func (r *UsergroupResource) Create(ctx context.Context, req resource.CreateReque
 			data.Handle = types.StringValue(ug.Handle)
 			data.Description = types.StringValue(ug.Description)
 
-			channelSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Prefs.Channels)
-			resp.Diagnostics.Append(diags...)
-			data.Channels = channelSet
+			// Only update channels if it was specified in the plan (not null)
+			if !data.Channels.IsNull() {
+				channelSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Prefs.Channels)
+				resp.Diagnostics.Append(diags...)
+				data.Channels = channelSet
+			}
 
-			userSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Users)
-			resp.Diagnostics.Append(diags...)
-			data.Users = userSet
+			// Only update users if it was specified in the plan (not null)
+			if !data.Users.IsNull() {
+				userSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Users)
+				resp.Diagnostics.Append(diags...)
+				data.Users = userSet
+			}
 
 			found = true
 			break
@@ -248,7 +256,7 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 	if needsUpdate {
 		// Build update options - always include all fields
 		var channels []string
-		if !data.Channels.IsNull() {
+		if !data.Channels.IsNull() && !data.Channels.IsUnknown() {
 			resp.Diagnostics.Append(data.Channels.ElementsAs(ctx, &channels, false)...)
 			if resp.Diagnostics.HasError() {
 				return
@@ -266,8 +274,8 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 		description := data.Description.ValueString()
 		updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionDescription(&description))
 
-		// Add channels only if not null
-		if !data.Channels.IsNull() {
+		// Add channels only if not null and not unknown
+		if !data.Channels.IsNull() && !data.Channels.IsUnknown() {
 			updateOptions = append(updateOptions, slack.UpdateUserGroupsOptionChannels(channels))
 		}
 
@@ -286,7 +294,7 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Update members only if changed
-	if !data.Users.Equal(state.Users) && !data.Users.IsNull() {
+	if !data.Users.Equal(state.Users) && !data.Users.IsNull() && !data.Users.IsUnknown() {
 		var users []string
 		resp.Diagnostics.Append(data.Users.ElementsAs(ctx, &users, false)...)
 		if resp.Diagnostics.HasError() {
@@ -316,13 +324,19 @@ func (r *UsergroupResource) Update(ctx context.Context, req resource.UpdateReque
 			data.Handle = types.StringValue(ug.Handle)
 			data.Description = types.StringValue(ug.Description)
 
-			channelSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Prefs.Channels)
-			resp.Diagnostics.Append(diags...)
-			data.Channels = channelSet
+			// Only update channels if it was specified in the plan (not null)
+			if !data.Channels.IsNull() {
+				channelSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Prefs.Channels)
+				resp.Diagnostics.Append(diags...)
+				data.Channels = channelSet
+			}
 
-			userSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Users)
-			resp.Diagnostics.Append(diags...)
-			data.Users = userSet
+			// Only update users if it was specified in the plan (not null)
+			if !data.Users.IsNull() {
+				userSet, diags := types.SetValueFrom(ctx, types.StringType, ug.Users)
+				resp.Diagnostics.Append(diags...)
+				data.Users = userSet
+			}
 
 			found = true
 			break
